@@ -1,0 +1,22 @@
+{
+  "lunar_arrival_intro": {
+    "speaker": "ALARA",
+    "text": "Professor Joker? Can you hear me? Your neural connection is stabilizing... There you are. The transfer was rougher than anticipated. Your consciousness has been projected into this data construct while your physical form remains in stasis back at the institute. I'm ALARA - Advanced Linguistic Analysis and Retrieval Algorithm. I've been tasked with guiding you through these forgotten data fragments.",
+    "audio": "lunar_arrival_intro.mp3"
+  },
+  "alara_research_discovery": {
+    "speaker": "ALARA",
+    "text": "Fascinating... This data fragment contains traces of Dr. Kai's research. The encoding patterns are unmistakable.",
+    "audio": "alara_research_discovery.mp3"
+  },
+  "alara_warning": {
+    "speaker": "ALARA",
+    "text": "Caution, Professor. This temporal anomaly is unstable. It's affecting your neural patterns. We should proceed carefully.",
+    "audio": "alara_warning.mp3"
+  },
+  "alara_generic_discovery": {
+    "speaker": "ALARA",
+    "text": "Another fragment secured. The pattern is becoming clearer...",
+    "audio": "alara_generic_discovery.mp3"
+  }
+}

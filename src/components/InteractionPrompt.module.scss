@@ -1,0 +1,30 @@
+.prompt {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.key {
+  background: var(--color-primary);
+  color: black;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.action {
+  color: var(--color-primary);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}

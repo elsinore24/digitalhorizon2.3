@@ -1,0 +1,61 @@
+.dialogueContainer {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 900px;
+  z-index: 100;
+}
+
+.dialogueBox {
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid #00ffff;
+  border-radius: 4px;
+  padding: 15px 20px;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+  font-family: 'Courier New', monospace;
+}
+
+.dialogueHeader {
+  margin-bottom: 10px;
+}
+
+.speakerName {
+  color: #00ffff;
+  font-size: 18px;
+  font-weight: bold;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  letter-spacing: 1px;
+  gap: 10px;
+}
+
+.visualizerContainer {
+  width: 150px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+}
+
+.dialogueText {
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+  position: relative;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+
+  &::after {
+    content: '_';
+    animation: blink 1s infinite;
+  }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}

@@ -1,0 +1,21 @@
+.container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+.perceptionToggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  background: rgba(0, 255, 255, 0.2);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  cursor: pointer;
+  z-index: 1000;
+
+  &:hover {
+    background: rgba(0, 255, 255, 0.3);
+  }
+}

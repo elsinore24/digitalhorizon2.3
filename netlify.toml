@@ -1,0 +1,14 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Add headers for audio files
+[[headers]]
+  for = "/audio/*"
+    [headers.values]
+    Access-Control-Allow-Origin = "*"

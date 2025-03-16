@@ -1,0 +1,133 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.grid {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: 
+    linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: gridPulse 4s linear infinite;
+}
+
+.scanlines {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 255, 255, 0.1),
+    rgba(0, 255, 255, 0.1) 50%,
+    transparent 50%,
+    transparent
+  );
+  background-size: 100% 4px;
+  animation: scanlines 10s linear infinite;
+  opacity: 0.3;
+}
+
+.dataStreams {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0.2;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent 0%,
+    rgba(0, 255, 255, 0.1) 25%,
+    transparent 50%
+  );
+  background-size: 200% 200%;
+  animation: dataStream 8s linear infinite;
+}
+
+.glowEffect {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  box-shadow: inset 0 0 100px rgba(0, 255, 255, 0.2);
+  animation: glow 4s ease-in-out infinite;
+}
+
+.dataPatterns {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.dataNode {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 255, 255, 0.5);
+  animation: nodePulse 2s ease-in-out infinite;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    background: rgba(0, 255, 255, 0.5);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes gridPulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes scanlines {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes dataStream {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 200% 200%;
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes nodePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
