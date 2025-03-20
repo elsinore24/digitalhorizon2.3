@@ -254,6 +254,54 @@ export function AudioProvider({ children }) {
           console.log('Audio playing (Howler):', dialogueId)
           setIsPlaying(true)
           setCurrentTrack(dialogueId)
+          
+          // For iOS, we need to try to get audio data from the Howler audio element
+          if (isIOS && audioContext) {
+            try {
+              // Try to find the Howler audio element
+              const howlerAudioElements = document.querySelectorAll('audio');
+              let howlerAudioElement = null;
+              
+              // Find the audio element that's currently playing
+              for (let i = 0; i < howlerAudioElements.length; i++) {
+                const el = howlerAudioElements[i];
+                if (!el.paused && el.currentTime > 0) {
+                  howlerAudioElement = el;
+                  break;
+                }
+              }
+              
+              if (howlerAudioElement) {
+                console.log('Found playing Howler audio element, connecting analyzer');
+                
+                // Disconnect any existing connections
+                if (mediaStreamSource) {
+                  try {
+                    mediaStreamSource.disconnect();
+                  } catch (e) {
+                    // Ignore disconnection errors
+                  }
+                }
+                
+                // Create a new source from the Howler audio element
+                try {
+                  mediaStreamSource = audioContext.createMediaElementSource(howlerAudioElement);
+                  
+                  // Connect the source to the analyzer and then to the destination
+                  mediaStreamSource.connect(analyzer);
+                  analyzer.connect(audioContext.destination);
+                  
+                  console.log('Successfully connected analyzer to Howler audio element');
+                } catch (err) {
+                  console.error('Error connecting analyzer to Howler audio:', err);
+                }
+              } else {
+                console.log('Could not find playing Howler audio element');
+              }
+            } catch (err) {
+              console.error('Error trying to connect analyzer to Howler:', err);
+            }
+          }
         },
         onend: () => {
           console.log('Audio ended (Howler):', dialogueId)
