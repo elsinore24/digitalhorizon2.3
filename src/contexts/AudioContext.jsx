@@ -1,5 +1,6 @@
 import { createContext, useState, useRef, useCallback, useEffect } from 'react'
 import { Howl, Howler } from 'howler'
+import * as Tone from 'tone'
 import dialogueData from '../data/dialogue.json'
 import { supabase } from '../config/supabase'
 
@@ -237,6 +238,59 @@ export function AudioProvider({ children }) {
     }
   }, [])
 
+  // Play audio using Tone.js for iOS
+  const playAudioWithTone = useCallback((url, dialogueId, dialogue) => {
+    try {
+      console.log('Using Tone.js for iOS playback:', dialogueId)
+      
+      // Make sure Tone.js is started (required for iOS)
+      if (Tone.context.state !== 'running') {
+        console.log('Starting Tone.js context')
+        Tone.start()
+      }
+      
+      // Create a player
+      const player = new Tone.Player({
+        url: url,
+        autostart: false,
+        onload: () => {
+          console.log('Audio loaded (Tone.js):', dialogueId)
+          setCurrentDialogue(dialogue)
+        }
+      }).toDestination()
+      
+      // Create an analyzer
+      const toneAnalyzer = new Tone.Analyser('fft', 256)
+      
+      // Connect the player to the analyzer
+      player.connect(toneAnalyzer)
+      
+      // Store the analyzer in our global analyzer variable
+      analyzer = toneAnalyzer
+      
+      // Play the audio when it's loaded
+      player.onstop = () => {
+        console.log('Audio ended (Tone.js):', dialogueId)
+        setIsPlaying(false)
+        setCurrentDialogue(null)
+      }
+      
+      // Start playback
+      player.start()
+      console.log('Audio playing (Tone.js):', dialogueId)
+      setIsPlaying(true)
+      setCurrentTrack(dialogueId)
+      
+      // Store the player
+      audioRef.current = player
+      
+      return true
+    } catch (err) {
+      console.error('Failed to play audio with Tone.js:', err)
+      return false
+    }
+  }, [])
+  
   // Play audio using Howler as fallback
   const playAudioWithHowler = useCallback((url, dialogueId, dialogue) => {
     try {
@@ -249,19 +303,50 @@ export function AudioProvider({ children }) {
         onload: () => {
           console.log('Audio loaded (Howler):', dialogueId)
           setCurrentDialogue(dialogue)
+          
+          // For iOS, we need to ensure the audio context is resumed
+          if (isIOS && audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+              console.log('AudioContext resumed on load')
+            }).catch(err => {
+              console.error('Failed to resume AudioContext on load:', err)
+            })
+          }
         },
         onplay: () => {
           console.log('Audio playing (Howler):', dialogueId)
-          setIsPlaying(true)
-          setCurrentTrack(dialogueId)
           
-          // We're not trying to connect to the Howler audio element anymore
-          // as it's not reliable on iOS
+          // Set playing state with a slight delay to ensure it's registered
+          // This helps with iOS detection issues
+          setTimeout(() => {
+            setIsPlaying(true)
+            setCurrentTrack(dialogueId)
+            console.log('Set isPlaying to true')
+            
+            // Force a state update to trigger visualizer
+            if (isIOS) {
+              // Create a small oscillation to ensure audio context is active
+              try {
+                if (audioContext && audioContext.state === 'suspended') {
+                  audioContext.resume().then(() => {
+                    console.log('AudioContext resumed on play')
+                  })
+                }
+              } catch (err) {
+                console.error('Error resuming audio context:', err)
+              }
+            }
+          }, 100)
         },
         onend: () => {
           console.log('Audio ended (Howler):', dialogueId)
-          setIsPlaying(false)
-          setCurrentDialogue(null)
+          
+          // Clear playing state with a slight delay to ensure proper cleanup
+          setTimeout(() => {
+            setIsPlaying(false)
+            setCurrentDialogue(null)
+            console.log('Set isPlaying to false')
+          }, 100)
         },
         onloaderror: (id, err) => {
           console.error('Audio load error (Howler):', dialogueId, err)
@@ -307,7 +392,12 @@ export function AudioProvider({ children }) {
       }
       
       if (audioRef.current) {
-        audioRef.current.stop()
+        if (typeof audioRef.current.stop === 'function') {
+          audioRef.current.stop()
+        } else if (typeof audioRef.current.dispose === 'function') {
+          // Tone.js players need to be disposed
+          audioRef.current.dispose()
+        }
       }
 
       const dialogue = dialogueData[dialogueId]
@@ -322,10 +412,10 @@ export function AudioProvider({ children }) {
       const localUrl = getAudioUrl(`${dialogueId}.mp3`)
       console.log('Using local audio URL to avoid CORS:', localUrl)
 
-      // For iOS, prefer Howler.js as it has better iOS compatibility
+      // For iOS, use Tone.js which has better iOS compatibility and analyzer support
       if (isIOS) {
-        console.log('Using Howler for iOS playback')
-        playAudioWithHowler(localUrl, dialogueId, dialogue)
+        console.log('Using Tone.js for iOS playback')
+        playAudioWithTone(localUrl, dialogueId, dialogue)
       } else {
         // Try to play using the audio element first
         const elementSuccess = playAudioWithElement(localUrl, dialogueId, dialogue)
@@ -345,9 +435,33 @@ export function AudioProvider({ children }) {
     if (!analyzer) return null
     
     try {
-      const bufferLength = analyzer.frequencyBinCount
-      const dataArray = new Uint8Array(bufferLength)
-      analyzer.getByteFrequencyData(dataArray)
+      let dataArray, bufferLength
+      
+      // Check if we're using a Tone.js analyzer (for iOS)
+      if (analyzer.getValue && typeof analyzer.getValue === 'function') {
+        // This is a Tone.js analyzer
+        console.log('Getting data from Tone.js analyzer')
+        
+        // Get the FFT data from Tone.js analyzer
+        const values = analyzer.getValue()
+        
+        // Convert to Uint8Array for compatibility with visualizer
+        bufferLength = values.length
+        dataArray = new Uint8Array(bufferLength)
+        
+        // Tone.js returns values in range -100 to 0 (dB), convert to 0-255 range
+        for (let i = 0; i < bufferLength; i++) {
+          // Convert from dB (-100 to 0) to 0-255 range
+          // -100dB maps to 0, 0dB maps to 255
+          const normalized = (values[i] + 100) / 100 // Now 0 to 1
+          dataArray[i] = Math.floor(normalized * 255)
+        }
+      } else {
+        // Standard Web Audio API analyzer
+        bufferLength = analyzer.frequencyBinCount
+        dataArray = new Uint8Array(bufferLength)
+        analyzer.getByteFrequencyData(dataArray)
+      }
       
       // Check if we have real audio data
       let sum = 0
