@@ -57,9 +57,12 @@ export default function AudioVisualizer() {
         const position = i / barCount
         const positionFactor = 1 - 2 * Math.abs(position - 0.5)
         
+        // Apply power function to create steeper dome effect
+        const enhancedPositionFactor = Math.pow(positionFactor, 2)
+        
         // Scale the height based on the frequency value and position
         // Make center bars much taller by applying a stronger position factor
-        const heightMultiplier = 0.5 + (positionFactor * 1.5) // 0.5 at edges, 2.0 at center
+        const heightMultiplier = 0.3 + (enhancedPositionFactor * 3.5) // 0.3 at edges, 3.8 at center
         const height = (value / 255) * HEIGHT * 0.8 * heightMultiplier
         
         // Set fill style with gradient
