@@ -238,9 +238,35 @@ export function AudioProvider({ children }) {
     if (!analyzer) return null
     
     try {
+      // Make sure Howler is initialized and connected
+      if (Howler.ctx && Howler.masterGain && isPlaying) {
+        // Ensure analyzer is connected to the audio source
+        if (!analyzer.connected) {
+          try {
+            Howler.masterGain.disconnect()
+            Howler.masterGain.connect(analyzer)
+            analyzer.connect(Howler.ctx.destination)
+            analyzer.connected = true
+            console.log('Reconnected analyzer to audio source')
+          } catch (connErr) {
+            console.error('Error connecting analyzer:', connErr)
+          }
+        }
+      }
+      
       const bufferLength = analyzer.frequencyBinCount
       const dataArray = new Uint8Array(bufferLength)
       analyzer.getByteFrequencyData(dataArray)
+      
+      // Debug: Check if we're getting any data
+      let sum = 0
+      for (let i = 0; i < bufferLength; i++) {
+        sum += dataArray[i]
+      }
+      
+      if (sum === 0 && isPlaying) {
+        console.log('No audio data detected despite audio playing')
+      }
       
       return {
         dataArray,
@@ -250,7 +276,7 @@ export function AudioProvider({ children }) {
       console.error('Error getting analyzer data:', err)
       return null
     }
-  }, [])
+  }, [isPlaying])
 
   return (
     <AudioContext.Provider value={{
