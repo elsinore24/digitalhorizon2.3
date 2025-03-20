@@ -33,12 +33,12 @@ export default function DialogueDisplay() {
   return (
     <div className={styles.dialogueContainer}>
       <div className={styles.dialogueBox}>
+        <div className={styles.visualizerContainer}>
+          <AudioVisualizer />
+        </div>
         <div className={styles.dialogueHeader}>
           <div className={styles.speakerName}>
             {currentDialogue.speaker}
-            <div className={styles.visualizerContainer}>
-              <AudioVisualizer />
-            </div>
           </div>
         </div>
         <p className={styles.dialogueText}>{displayText}</p>
