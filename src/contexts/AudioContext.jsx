@@ -11,24 +11,35 @@ let analyzer = null
 // Initialize Web Audio API context and connect to Howler
 const initAudioContext = () => {
   if (!analyzer && window.Howler) {
-    // Get Howler's audio context
-    const audioCtx = Howler.ctx
-    
-    // Create analyzer node
-    analyzer = audioCtx.createAnalyser()
-    analyzer.fftSize = 256
-    analyzer.smoothingTimeConstant = 0.8
-    
-    // Connect Howler's masterGain to our analyzer
-    if (Howler.masterGain) {
-      // Connect analyzer between masterGain and destination
-      Howler.masterGain.disconnect()
-      Howler.masterGain.connect(analyzer)
-      analyzer.connect(audioCtx.destination)
+    try {
+      // Get Howler's audio context
+      const audioCtx = Howler.ctx
       
-      console.log('Successfully connected analyzer to Howler audio context')
-    } else {
-      console.error('Could not access Howler.masterGain')
+      // Check if audioCtx is available
+      if (!audioCtx) {
+        console.warn('Howler audio context is not available')
+        return { analyzer: null }
+      }
+      
+      // Create analyzer node
+      analyzer = audioCtx.createAnalyser()
+      analyzer.fftSize = 256
+      analyzer.smoothingTimeConstant = 0.8
+      
+      // Connect Howler's masterGain to our analyzer
+      if (Howler.masterGain) {
+        // Connect analyzer between masterGain and destination
+        Howler.masterGain.disconnect()
+        Howler.masterGain.connect(analyzer)
+        analyzer.connect(audioCtx.destination)
+        
+        console.log('Successfully connected analyzer to Howler audio context')
+      } else {
+        console.error('Could not access Howler.masterGain')
+      }
+    } catch (err) {
+      console.error('Error initializing audio analyzer:', err)
+      analyzer = null
     }
   }
   return { analyzer }
@@ -186,13 +197,18 @@ export function AudioProvider({ children }) {
   const getAnalyzerData = useCallback(() => {
     if (!analyzer) return null
     
-    const bufferLength = analyzer.frequencyBinCount
-    const dataArray = new Uint8Array(bufferLength)
-    analyzer.getByteFrequencyData(dataArray)
-    
-    return {
-      dataArray,
-      bufferLength
+    try {
+      const bufferLength = analyzer.frequencyBinCount
+      const dataArray = new Uint8Array(bufferLength)
+      analyzer.getByteFrequencyData(dataArray)
+      
+      return {
+        dataArray,
+        bufferLength
+      }
+    } catch (err) {
+      console.error('Error getting analyzer data:', err)
+      return null
     }
   }, [])
 
