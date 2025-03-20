@@ -464,10 +464,13 @@ export function AudioProvider({ children }) {
       // Check if we're using a Tone.js analyzer (for iOS)
       if (analyzer.getValue && typeof analyzer.getValue === 'function') {
         // This is a Tone.js analyzer
-        // console.log('Getting data from Tone.js analyzer')
+        console.log('Getting data from Tone.js analyzer')
         
         // Get the FFT data from Tone.js analyzer
         const values = analyzer.getValue()
+        
+        // Log the first few values to debug
+        console.log('Raw analyzer values (first 5):', values.slice(0, 5))
         
         // Convert to Uint8Array for compatibility with visualizer
         bufferLength = values.length
@@ -476,14 +479,21 @@ export function AudioProvider({ children }) {
         // Tone.js returns values in range -100 to 0 (dB), convert to 0-255 range
         // But we need to handle the case where there's no sound
         let hasSound = false
+        let maxValue = -100
         
         for (let i = 0; i < bufferLength; i++) {
+          // Track the maximum value for debugging
+          if (values[i] > maxValue) {
+            maxValue = values[i]
+          }
+          
           // Check if there's any significant audio data
           if (values[i] > -80) { // -80dB is a reasonable threshold for "silence"
             hasSound = true
-            break
           }
         }
+        
+        console.log('Max analyzer value:', maxValue, 'Has sound:', hasSound)
         
         if (hasSound) {
           for (let i = 0; i < bufferLength; i++) {
@@ -496,6 +506,9 @@ export function AudioProvider({ children }) {
           // If there's no sound, set all values to 0
           dataArray.fill(0)
         }
+        
+        // Log the converted values for debugging
+        console.log('Converted values (first 5):', Array.from(dataArray.slice(0, 5)))
       } else {
         // Standard Web Audio API analyzer
         bufferLength = analyzer.frequencyBinCount
