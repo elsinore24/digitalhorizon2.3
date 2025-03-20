@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import useAudio from '../hooks/useAudio'
-import AudioVisualizer from './AudioVisualizer'
 import styles from './DialogueDisplay.module.scss'
 
 export default function DialogueDisplay() {
@@ -33,9 +32,6 @@ export default function DialogueDisplay() {
   return (
     <div className={styles.dialogueContainer}>
       <div className={styles.dialogueBox}>
-        <div className={styles.visualizerContainer}>
-          <AudioVisualizer />
-        </div>
         <div className={styles.dialogueHeader}>
           <div className={styles.speakerName}>
             {currentDialogue.speaker}

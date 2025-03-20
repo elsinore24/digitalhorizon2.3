@@ -20,9 +20,7 @@ export default function AudioVisualizer() {
       // Clear the canvas
       ctx.clearRect(0, 0, WIDTH, HEIGHT)
       
-      // Draw black background
-      ctx.fillStyle = 'rgba(0, 0, 0, 1)'
-      ctx.fillRect(0, 0, WIDTH, HEIGHT)
+      // No background fill - let page background show through
       
       // Create gradient for the bars - orange/gold at top to pink/purple at bottom
       const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT)
