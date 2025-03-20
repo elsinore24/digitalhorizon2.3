@@ -238,14 +238,16 @@ export function AudioProvider({ children }) {
     }
   }, [])
 
-  // Play audio using Tone.js for iOS
+  // Play audio using Tone.js for iOS - no fallbacks, improved logging
   const playAudioWithTone = useCallback((url, dialogueId, dialogue) => {
     try {
-      console.log('Using Tone.js for iOS playback:', dialogueId)
+      console.log('[iOS Tone.js] Starting playback for:', dialogueId)
+      console.log('[iOS Tone.js] Audio URL:', url)
+      console.log('[iOS Tone.js] Tone.js context state:', Tone.context.state)
       
       // Make sure Tone.js is started (required for iOS)
       if (Tone.context.state !== 'running') {
-        console.log('Starting Tone.js context')
+        console.log('[iOS Tone.js] Starting Tone.js context')
         Tone.start()
       }
       
@@ -254,54 +256,76 @@ export function AudioProvider({ children }) {
         try {
           // Ensure Tone.js context is running
           await Tone.start()
-          console.log('Tone.js context started successfully')
+          console.log('[iOS Tone.js] Context started successfully')
           
           // Create a player directly with URL
+          console.log('[iOS Tone.js] Creating player with URL:', url)
           const player = new Tone.Player({
             url: url,
             autostart: false,
             loop: false,
             onload: () => {
-              console.log('Tone.js player loaded successfully')
+              console.log('[iOS Tone.js] Player loaded successfully')
               setCurrentDialogue(dialogue)
               
               // Create an analyzer with default settings
+              console.log('[iOS Tone.js] Creating analyzer')
               const toneAnalyzer = new Tone.Analyser('fft', 256)
               
               // Connect the player to the analyzer and then to the destination
+              console.log('[iOS Tone.js] Connecting player to analyzer and destination')
               player.fan(Tone.Destination, toneAnalyzer)
               
               // Store the analyzer in our global analyzer variable
               analyzer = toneAnalyzer
               
+              // Log analyzer state before playback
+              console.log('[iOS Tone.js] Analyzer created, initial values:', toneAnalyzer.getValue().slice(0, 5))
+              
               // Start playback
+              console.log('[iOS Tone.js] Starting playback')
               player.start()
-              console.log('Audio playing (Tone.js):', dialogueId)
+              console.log('[iOS Tone.js] Playback started for:', dialogueId)
               setIsPlaying(true)
               setCurrentTrack(dialogueId)
               
               // Set up stop handler
               player.onstop = () => {
-                console.log('Audio ended (Tone.js):', dialogueId)
+                console.log('[iOS Tone.js] Audio ended:', dialogueId)
                 setIsPlaying(false)
                 setCurrentDialogue(null)
               }
               
               // Store the player
               audioRef.current = player
+              
+              // Check analyzer after a short delay to verify it's receiving data
+              setTimeout(() => {
+                if (toneAnalyzer && typeof toneAnalyzer.getValue === 'function') {
+                  const checkValues = toneAnalyzer.getValue();
+                  console.log('[iOS Tone.js] Analyzer values after playback (first 5):', checkValues.slice(0, 5));
+                  
+                  // Check if we're getting any significant values
+                  let maxValue = -100;
+                  for (let i = 0; i < checkValues.length; i++) {
+                    if (checkValues[i] > maxValue) {
+                      maxValue = checkValues[i];
+                    }
+                  }
+                  console.log('[iOS Tone.js] Max analyzer value after playback:', maxValue);
+                }
+              }, 500);
             },
             onerror: (err) => {
-              console.error('Tone.js player error:', err)
-              // Fall back to Howler
-              console.log('Falling back to Howler due to Tone.js error')
-              playAudioWithHowler(url, dialogueId, dialogue)
+              console.error('[iOS Tone.js] Player error:', err)
+              // No fallback - just log the error
+              console.error('[iOS Tone.js] Failed to play audio with Tone.js')
             }
           })
         } catch (err) {
-          console.error('Error starting Tone.js:', err)
-          // Fall back to Howler
-          console.log('Falling back to Howler due to Tone.js start error')
-          playAudioWithHowler(url, dialogueId, dialogue)
+          console.error('[iOS Tone.js] Error starting Tone.js:', err)
+          // No fallback - just log the error
+          console.error('[iOS Tone.js] Failed to start Tone.js')
         }
       }
       
@@ -310,7 +334,7 @@ export function AudioProvider({ children }) {
       
       return true
     } catch (err) {
-      console.error('Failed to play audio with Tone.js:', err)
+      console.error('[iOS Tone.js] Failed to play audio:', err)
       return false
     }
   }, [])
@@ -438,9 +462,11 @@ export function AudioProvider({ children }) {
 
       // For iOS, use Tone.js which has better iOS compatibility and analyzer support
       if (isIOS) {
-        console.log('Using Tone.js for iOS playback')
+        console.log('[iOS] Using Tone.js exclusively for iOS playback')
         playAudioWithTone(localUrl, dialogueId, dialogue)
       } else {
+        // For non-iOS, continue using the existing approach
+        console.log('[Desktop] Using standard Web Audio API')
         // Try to play using the audio element first
         const elementSuccess = playAudioWithElement(localUrl, dialogueId, dialogue)
         
@@ -452,7 +478,7 @@ export function AudioProvider({ children }) {
     } catch (err) {
       console.error('Failed to play audio:', err)
     }
-  }, [playAudioWithElement, playAudioWithHowler])
+  }, [playAudioWithElement, playAudioWithHowler, playAudioWithTone])
   
   // Function to get analyzer data for visualizer
   const getAnalyzerData = useCallback(() => {
@@ -464,13 +490,13 @@ export function AudioProvider({ children }) {
       // Check if we're using a Tone.js analyzer (for iOS)
       if (analyzer.getValue && typeof analyzer.getValue === 'function') {
         // This is a Tone.js analyzer
-        console.log('Getting data from Tone.js analyzer')
+        console.log('[iOS Tone.js Analyzer] Getting data from Tone.js analyzer')
         
         // Get the FFT data from Tone.js analyzer
         const values = analyzer.getValue()
         
         // Log the first few values to debug
-        console.log('Raw analyzer values (first 5):', values.slice(0, 5))
+        console.log('[iOS Tone.js Analyzer] Raw analyzer values (first 5):', values.slice(0, 5))
         
         // Convert to Uint8Array for compatibility with visualizer
         bufferLength = values.length
@@ -481,6 +507,12 @@ export function AudioProvider({ children }) {
         let hasSound = false
         let maxValue = -100
         
+        // Log the full analyzer values for debugging (first 20 values)
+        if (isIOS) {
+          console.log('[iOS Tone.js Analyzer] Full analyzer values (first 20):', 
+            Array.from(values.slice(0, 20)).map(v => v.toFixed(2)).join(', '));
+        }
+        
         for (let i = 0; i < bufferLength; i++) {
           // Track the maximum value for debugging
           if (values[i] > maxValue) {
@@ -488,12 +520,12 @@ export function AudioProvider({ children }) {
           }
           
           // Check if there's any significant audio data
-          if (values[i] > -80) { // -80dB is a reasonable threshold for "silence"
+          if (values[i] > -95) { // -95dB is a lower threshold to capture quieter sounds
             hasSound = true
           }
         }
         
-        console.log('Max analyzer value:', maxValue, 'Has sound:', hasSound)
+        console.log('[iOS Tone.js Analyzer] Max analyzer value:', maxValue.toFixed(2), 'Has sound:', hasSound)
         
         if (hasSound) {
           for (let i = 0; i < bufferLength; i++) {
