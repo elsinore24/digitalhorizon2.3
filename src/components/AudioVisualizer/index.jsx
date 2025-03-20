@@ -5,10 +5,9 @@ import styles from './AudioVisualizer.module.scss'
 export default function AudioVisualizer() {
   const canvasRef = useRef(null)
   const animationRef = useRef(null)
-  const waveformDataRef = useRef([]) // Store waveform data for smoother transitions
+  const timeRef = useRef(0)
   const { getAnalyzerData, isPlaying, analyzer } = useAudio()
   const [fallbackMode, setFallbackMode] = useState(false)
-  const [visualizationMode, setVisualizationMode] = useState('combined') // 'bars', 'waveform', or 'combined'
   
   // Reset fallback mode when audio starts playing
   useEffect(() => {
@@ -22,296 +21,245 @@ export default function AudioVisualizer() {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     
-    // Initialize waveform data if empty
-    if (waveformDataRef.current.length === 0) {
-      waveformDataRef.current = Array(canvas.width).fill(canvas.height / 2)
-    }
-    
     const draw = () => {
       const WIDTH = canvas.width
       const HEIGHT = canvas.height
+      
+      // Update time reference
+      timeRef.current += 0.01
       
       // Clear with fade effect
       ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
       ctx.fillRect(0, 0, WIDTH, HEIGHT)
       
-      // Draw grid
+      // Draw grid with wave effect
       ctx.beginPath()
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)'
+      ctx.strokeStyle = 'rgba(0, 100, 255, 0.05)'
       ctx.lineWidth = 0.5
       
-      // Vertical grid lines
-      for (let x = 0; x <= WIDTH; x += 10) {
+      // Vertical grid lines with perspective effect
+      const gridSpacing = 20
+      for (let x = 0; x <= WIDTH; x += gridSpacing) {
+        const distortion = Math.sin(x / WIDTH * Math.PI + timeRef.current) * 5
         ctx.moveTo(x, 0)
-        ctx.lineTo(x, HEIGHT)
+        ctx.lineTo(x + distortion, HEIGHT)
       }
       
-      // Horizontal grid lines
-      for (let y = 0; y <= HEIGHT; y += 10) {
+      // Horizontal grid lines with wave effect
+      for (let y = 0; y <= HEIGHT; y += gridSpacing) {
+        const waveAmplitude = 5
+        const waveFrequency = 0.1
         ctx.moveTo(0, y)
-        ctx.lineTo(WIDTH, y)
+        
+        for (let x = 0; x <= WIDTH; x += 5) {
+          const distortion = Math.sin(x * waveFrequency + timeRef.current * 2) * waveAmplitude
+          ctx.lineTo(x, y + distortion)
+        }
       }
       ctx.stroke()
       
       // More bars for better speech representation
-      const numBars = 16 // Increased from 8 to 16 for more detail
-      const barWidth = (WIDTH / numBars) * 0.8
-      const spacing = (WIDTH - numBars * barWidth) / (numBars + 1)
+      const numBars = 32 // Increased from 8 to 32 for more detail
+      const barWidth = (WIDTH / numBars) * 0.7
+      const spacing = (WIDTH / numBars) * 0.3
       
       // Try to get analyzer data
       const analyzerData = getAnalyzerData()
       
-      // If we have analyzer data and audio is playing, use it
+      // Create audio data array (either from analyzer or synthetic)
+      let audioData = []
+      
       if (analyzerData && isPlaying && !fallbackMode) {
         try {
           const { dataArray, bufferLength } = analyzerData
           
           // Check if we have valid data
-          let hasData = false;
+          let hasData = false
           for (let i = 0; i < bufferLength; i++) {
             if (dataArray[i] > 0) {
-              hasData = true;
-              break;
+              hasData = true
+              break
             }
           }
           
-          if (!hasData) {
-            // Use speech-like synthetic data
-            drawSpeechLikeVisualization(ctx, WIDTH, HEIGHT, numBars, barWidth, spacing)
-            animationRef.current = requestAnimationFrame(draw)
-            return
+          if (hasData) {
+            // Use real audio data
+            const step = Math.floor(bufferLength / numBars)
+            for (let i = 0; i < numBars; i++) {
+              let sum = 0
+              const rangeSize = Math.max(1, Math.floor(step / 2))
+              const startIdx = Math.max(0, i * step - rangeSize)
+              const endIdx = Math.min(bufferLength - 1, i * step + rangeSize)
+              
+              for (let j = startIdx; j <= endIdx; j++) {
+                sum += dataArray[j]
+              }
+              
+              // Normalize value (0-255) to 0-1 range
+              const value = (sum / (endIdx - startIdx + 1)) / 255.0
+              audioData.push(value)
+            }
+          } else {
+            // Generate synthetic data
+            audioData = generateSpeechLikeData(numBars)
           }
-          
-          // Draw frequency bars
-          if (visualizationMode === 'bars' || visualizationMode === 'combined') {
-            drawFrequencyBars(ctx, dataArray, bufferLength, WIDTH, HEIGHT, numBars, barWidth, spacing)
-          }
-          
-          // Draw waveform
-          if (visualizationMode === 'waveform' || visualizationMode === 'combined') {
-            drawWaveform(ctx, dataArray, bufferLength, WIDTH, HEIGHT)
-          }
-          
         } catch (err) {
           console.error('Error processing analyzer data:', err)
           setFallbackMode(true)
+          audioData = generateSpeechLikeData(numBars)
         }
       } else {
-        // Use speech-like synthetic data
-        drawSpeechLikeVisualization(ctx, WIDTH, HEIGHT, numBars, barWidth, spacing)
+        // Generate synthetic data
+        audioData = generateSpeechLikeData(numBars)
       }
+      
+      // Apply smoothing
+      const smoothedData = [...audioData]
+      for (let i = 1; i < numBars - 1; i++) {
+        smoothedData[i] = (
+          audioData[i-1] * 0.2 + 
+          audioData[i] * 0.6 + 
+          audioData[i+1] * 0.2
+        )
+      }
+      
+      // Draw 3D-like circular visualization
+      const centerX = WIDTH / 2
+      const centerY = HEIGHT / 2
+      const maxRadius = Math.min(WIDTH, HEIGHT) * 0.4
+      const layers = 5
+      
+      // Draw multiple circular layers
+      for (let layer = 0; layer < layers; layer++) {
+        const layerRadius = maxRadius * (0.5 + layer * 0.1)
+        const points = []
+        
+        // Calculate points around the circle
+        for (let i = 0; i < numBars; i++) {
+          const angle = (i / numBars) * Math.PI * 2
+          const amplitude = smoothedData[i] * maxRadius * 0.5
+          const radius = layerRadius + amplitude * (layer / layers)
+          
+          const x = centerX + Math.cos(angle) * radius
+          const y = centerY + Math.sin(angle) * radius
+          
+          points.push({ x, y, value: smoothedData[i] })
+        }
+        
+        // Draw filled shape with gradient
+        ctx.beginPath()
+        ctx.moveTo(points[0].x, points[0].y)
+        
+        // Connect points with curves for smoother shape
+        for (let i = 0; i < points.length; i++) {
+          const current = points[i]
+          const next = points[(i + 1) % points.length]
+          
+          // Control points for curve
+          const cpX1 = current.x + (next.x - current.x) * 0.3
+          const cpY1 = current.y + (next.y - current.y) * 0.1
+          const cpX2 = current.x + (next.x - current.x) * 0.7
+          const cpY2 = current.y + (next.y - current.y) * 0.9
+          
+          ctx.bezierCurveTo(cpX1, cpY1, cpX2, cpY2, next.x, next.y)
+        }
+        
+        // Create gradient fill
+        const gradient = ctx.createRadialGradient(
+          centerX, centerY, 0,
+          centerX, centerY, maxRadius * 1.5
+        )
+        
+        // Layer-specific colors
+        const hueBase = 180 + layer * 30 // Blue to green to yellow
+        const saturation = 100 - layer * 10
+        const lightness = 50 + layer * 5
+        
+        gradient.addColorStop(0, `hsla(${hueBase}, ${saturation}%, ${lightness}%, 0.1)`)
+        gradient.addColorStop(0.5, `hsla(${hueBase + 20}, ${saturation}%, ${lightness}%, 0.05)`)
+        gradient.addColorStop(1, `hsla(${hueBase + 40}, ${saturation}%, ${lightness}%, 0)`)
+        
+        ctx.fillStyle = gradient
+        ctx.fill()
+        
+        // Draw outline with glow
+        ctx.strokeStyle = `hsla(${hueBase}, ${saturation}%, ${lightness}%, 0.8)`
+        ctx.lineWidth = 1
+        ctx.stroke()
+        
+        // Add second stroke for glow effect
+        ctx.strokeStyle = `hsla(${hueBase}, ${saturation}%, ${lightness + 20}%, 0.3)`
+        ctx.lineWidth = 2
+        ctx.stroke()
+      }
+      
+      // Draw connecting lines between layers for 3D mesh effect
+      ctx.globalAlpha = 0.2
+      for (let i = 0; i < numBars; i += 2) { // Skip some points for cleaner look
+        const angle = (i / numBars) * Math.PI * 2
+        
+        ctx.beginPath()
+        ctx.strokeStyle = `hsla(${200 + i}, 100%, 70%, 0.3)`
+        ctx.lineWidth = 0.5
+        
+        // Draw line from center to outer edge with wave distortion
+        const segments = 10
+        ctx.moveTo(centerX, centerY)
+        
+        for (let j = 1; j <= segments; j++) {
+          const segmentRadius = (j / segments) * maxRadius * 1.2
+          const distortion = Math.sin(j / segments * Math.PI + timeRef.current * 2) * 10
+          
+          const x = centerX + Math.cos(angle + distortion * 0.01) * segmentRadius
+          const y = centerY + Math.sin(angle + distortion * 0.01) * segmentRadius
+          
+          ctx.lineTo(x, y)
+        }
+        
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1.0
+      
+      // Draw center point with glow
+      const centerGlow = ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, maxRadius * 0.2
+      )
+      centerGlow.addColorStop(0, 'rgba(255, 255, 255, 0.8)')
+      centerGlow.addColorStop(0.2, 'rgba(100, 200, 255, 0.5)')
+      centerGlow.addColorStop(1, 'rgba(0, 100, 255, 0)')
+      
+      ctx.fillStyle = centerGlow
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, maxRadius * 0.2, 0, Math.PI * 2)
+      ctx.fill()
+      
+      // Draw particles
+      drawParticles(ctx, WIDTH, HEIGHT, audioData)
       
       animationRef.current = requestAnimationFrame(draw)
     }
     
-    // Function to draw frequency bars
-    const drawFrequencyBars = (ctx, dataArray, bufferLength, WIDTH, HEIGHT, numBars, barWidth, spacing) => {
-      const step = Math.floor(bufferLength / numBars)
-      
-      // Speech frequency emphasis - human speech is typically 85-255 Hz (formants)
-      // and has harmonics up to about 8000 Hz
-      const speechEmphasis = [
-        1.2, 1.4, 1.5, 1.3, 1.1, 0.9, 0.8, 0.7, // Lower frequencies (formants)
-        0.6, 0.5, 0.5, 0.6, 0.7, 0.6, 0.5, 0.4  // Higher frequencies (harmonics)
-      ]
-      
-      for (let i = 0; i < numBars; i++) {
-        // Get frequency data for this bar - average a range of frequencies for smoother visualization
-        let sum = 0
-        const rangeSize = Math.max(1, Math.floor(step / 2))
-        const startIdx = Math.max(0, i * step - rangeSize)
-        const endIdx = Math.min(bufferLength - 1, i * step + rangeSize)
-        
-        for (let j = startIdx; j <= endIdx; j++) {
-          sum += dataArray[j]
-        }
-        
-        // Normalize the value (0-255) to a height and apply speech emphasis
-        const value = (sum / (endIdx - startIdx + 1)) / 255.0
-        const emphasisFactor = speechEmphasis[Math.min(i, speechEmphasis.length - 1)]
-        const height = HEIGHT * 0.8 * Math.max(0.05, value * emphasisFactor)
-        
-        const x = spacing + i * (barWidth + spacing)
-        
-        // Color based on frequency range (blue-cyan for low, cyan-green for mid, green-yellow for high)
-        let barColor
-        if (i < numBars / 3) {
-          // Low frequencies - blue to cyan
-          barColor = `rgba(0, ${155 + (i * 100 / (numBars/3))}, 255, 0.9)`
-        } else if (i < 2 * numBars / 3) {
-          // Mid frequencies - cyan to green
-          const idx = i - numBars / 3
-          barColor = `rgba(0, 255, ${255 - (idx * 255 / (numBars/3))}, 0.9)`
-        } else {
-          // High frequencies - green to yellow
-          const idx = i - 2 * numBars / 3
-          barColor = `rgba(${(idx * 255 / (numBars/3))}, 255, 0, 0.9)`
-        }
-        
-        // Draw glow with intensity based on height
-        const glowIntensity = 0.1 + (height / (HEIGHT * 0.8)) * 0.4
-        const glow = ctx.createLinearGradient(0, HEIGHT - height, 0, HEIGHT)
-        glow.addColorStop(0, 'rgba(0, 255, 255, 0)')
-        glow.addColorStop(0.5, `rgba(0, 255, 255, ${glowIntensity})`)
-        glow.addColorStop(1, 'rgba(0, 255, 255, 0.1)')
-        
-        ctx.fillStyle = glow
-        ctx.fillRect(x - 2, HEIGHT - height - 2, barWidth + 4, height + 4)
-        
-        // Draw bar with gradient
-        const gradient = ctx.createLinearGradient(0, HEIGHT - height, 0, HEIGHT)
-        gradient.addColorStop(0, barColor)
-        gradient.addColorStop(1, 'rgba(0, 255, 255, 0.4)')
-        
-        ctx.fillStyle = gradient
-        ctx.fillRect(x, HEIGHT - height, barWidth, height)
-        
-        // Add highlight at top of bar
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
-        ctx.fillRect(x, HEIGHT - height, barWidth, 2)
-        
-        // Add pulsing effect for more dynamic visualization
-        if (height > HEIGHT * 0.4) {
-          const pulseSize = Math.min(10, height / 10)
-          ctx.beginPath()
-          ctx.arc(x + barWidth / 2, HEIGHT - height - pulseSize, pulseSize, 0, Math.PI * 2)
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
-          ctx.fill()
-        }
-      }
-    }
-    
-    // Function to draw waveform
-    const drawWaveform = (ctx, dataArray, bufferLength, WIDTH, HEIGHT) => {
-      // Create a new array for waveform data
-      const newWaveformData = []
-      
-      // Use time domain data for waveform if available
-      const timeDataArray = new Uint8Array(bufferLength)
-      if (analyzer) {
-        try {
-          analyzer.getByteTimeDomainData(timeDataArray)
-        } catch (err) {
-          console.error('Error getting time domain data:', err)
-        }
-      }
-      
-      // Draw the waveform
-      ctx.beginPath()
-      ctx.lineWidth = 2
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)'
-      
-      const sliceWidth = WIDTH / bufferLength
-      let x = 0
-      
-      for (let i = 0; i < bufferLength; i++) {
-        const v = timeDataArray[i] / 128.0
-        const y = v * HEIGHT / 2
-        
-        // Store the new data point
-        newWaveformData.push(y)
-        
-        if (i === 0) {
-          ctx.moveTo(x, y)
-        } else {
-          ctx.lineTo(x, y)
-        }
-        
-        x += sliceWidth
-      }
-      
-      // If we don't have enough data points, interpolate
-      if (newWaveformData.length < WIDTH) {
-        const factor = WIDTH / newWaveformData.length
-        const interpolatedData = []
-        
-        for (let i = 0; i < WIDTH; i++) {
-          const idx = i / factor
-          const idxFloor = Math.floor(idx)
-          const idxCeil = Math.min(newWaveformData.length - 1, Math.ceil(idx))
-          const fraction = idx - idxFloor
-          
-          interpolatedData[i] = newWaveformData[idxFloor] * (1 - fraction) + 
-                               newWaveformData[idxCeil] * fraction
-        }
-        
-        waveformDataRef.current = interpolatedData
-      } else if (newWaveformData.length > WIDTH) {
-        // Downsample
-        const factor = newWaveformData.length / WIDTH
-        const downsampledData = []
-        
-        for (let i = 0; i < WIDTH; i++) {
-          const startIdx = Math.floor(i * factor)
-          const endIdx = Math.min(newWaveformData.length - 1, Math.floor((i + 1) * factor))
-          let sum = 0
-          
-          for (let j = startIdx; j <= endIdx; j++) {
-            sum += newWaveformData[j]
-          }
-          
-          downsampledData[i] = sum / (endIdx - startIdx + 1)
-        }
-        
-        waveformDataRef.current = downsampledData
-      } else {
-        waveformDataRef.current = newWaveformData
-      }
-      
-      // Complete the waveform path
-      ctx.lineTo(WIDTH, HEIGHT / 2)
-      ctx.stroke()
-      
-      // Add glow effect to the waveform
-      ctx.lineWidth = 4
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)'
-      ctx.stroke()
-      
-      // Add a center line
-      ctx.beginPath()
-      ctx.lineWidth = 1
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)'
-      ctx.moveTo(0, HEIGHT / 2)
-      ctx.lineTo(WIDTH, HEIGHT / 2)
-      ctx.stroke()
-    }
-    
-    // Function to draw speech-like synthetic visualization
-    const drawSpeechLikeVisualization = (ctx, WIDTH, HEIGHT, numBars, barWidth, spacing) => {
+    // Function to generate speech-like data
+    const generateSpeechLikeData = (numBars) => {
       const time = Date.now() / 1000
-      
-      // Create a virtual frequency spectrum with speech-like behavior
       const virtualSpectrum = []
       
-      // Speech patterns have these characteristics:
-      // 1. Syllables occur at 2-5 Hz (every 0.2-0.5 seconds)
-      // 2. Formants (resonant frequencies) are concentrated in specific bands
-      // 3. Pauses between words and sentences
-      
-      // Simulate syllable rhythm (2-5 Hz)
+      // Speech patterns simulation
       const syllableRate = 3.5 // syllables per second
       const syllablePhase = time * syllableRate
       const syllableAmplitude = 0.5 + 0.5 * Math.sin(syllablePhase * Math.PI * 2)
       
-      // Simulate word boundaries (0.5-1 Hz)
       const wordRate = 0.8 // words per second
       const wordPhase = time * wordRate
       const wordBoundary = Math.sin(wordPhase * Math.PI * 2) > 0.7
       
-      // Simulate sentence pauses (0.1-0.2 Hz)
       const sentenceRate = 0.15 // sentences per second
       const sentencePhase = time * sentenceRate
       const sentencePause = Math.sin(sentencePhase * Math.PI * 2) > 0.9
       
-      // Generate a speech-like frequency distribution
       for (let i = 0; i < numBars; i++) {
-        // Speech formants are concentrated in specific frequency bands
-        // First formant: ~500 Hz (low)
-        // Second formant: ~1500 Hz (mid-low)
-        // Third formant: ~2500 Hz (mid)
-        // Fourth formant: ~3500 Hz (mid-high)
-        
-        // Map bar index to approximate frequency band
+        // Map bar index to frequency band
         const freqBand = i / numBars
         
         // Base amplitude varies by frequency band to simulate formants
@@ -340,16 +288,11 @@ export default function AudioVisualizer() {
         if (wordBoundary) baseAmplitude *= 0.3
         if (sentencePause) baseAmplitude *= 0.1
         
-        // Different oscillation speeds for different frequency bands
+        // Add oscillations and noise
         const oscillationSpeed = 1.5 + (i / numBars) * 3
-        
-        // Phase shift based on position to create wave-like motion
         const phaseShift = i * 0.7
-        
-        // Add some randomness for more natural look
         const noise = 0.05 * Math.sin(time * 10 + i * 20)
         
-        // Combine multiple oscillations with different frequencies
         let value = baseAmplitude * (
           0.6 * Math.sin(time * oscillationSpeed + phaseShift) +
           0.3 * Math.sin(time * oscillationSpeed * 1.7 + phaseShift * 1.3) +
@@ -357,124 +300,57 @@ export default function AudioVisualizer() {
           noise
         )
         
-        // Ensure value is positive and within range
         value = Math.abs(value)
         value = Math.min(1, Math.max(0.05, value))
-        
-        // Apply playing state - more active when playing
         value = value * (isPlaying ? 1 : 0.3)
         
         virtualSpectrum.push(value)
       }
       
-      // Apply some smoothing between adjacent bars for more natural look
-      for (let i = 1; i < numBars - 1; i++) {
-        virtualSpectrum[i] = (
-          virtualSpectrum[i-1] * 0.2 + 
-          virtualSpectrum[i] * 0.6 + 
-          virtualSpectrum[i+1] * 0.2
-        )
+      return virtualSpectrum
+    }
+    
+    // Function to draw particles
+    const drawParticles = (ctx, WIDTH, HEIGHT, audioData) => {
+      // Calculate overall audio energy
+      let audioEnergy = 0
+      if (audioData.length > 0) {
+        for (let i = 0; i < audioData.length; i++) {
+          audioEnergy += audioData[i]
+        }
+        audioEnergy /= audioData.length
+      } else {
+        audioEnergy = 0.3 + 0.2 * Math.sin(timeRef.current * 3)
       }
       
-      // Draw the bars using the virtual spectrum
-      for (let i = 0; i < numBars; i++) {
-        const height = HEIGHT * 0.8 * virtualSpectrum[i]
-        const x = spacing + i * (barWidth + spacing)
+      // Number of particles based on energy
+      const particleCount = Math.floor(20 + audioEnergy * 30)
+      
+      // Draw particles
+      for (let i = 0; i < particleCount; i++) {
+        // Position based on time and index
+        const angle = (i / particleCount) * Math.PI * 2 + timeRef.current
+        const distance = 20 + audioEnergy * 40 + 10 * Math.sin(timeRef.current * 2 + i)
         
-        // Color based on frequency range (blue-cyan for low, cyan-green for mid, green-yellow for high)
-        let barColor
-        if (i < numBars / 3) {
-          // Low frequencies - blue to cyan
-          barColor = `rgba(0, ${155 + (i * 100 / (numBars/3))}, 255, 0.9)`
-        } else if (i < 2 * numBars / 3) {
-          // Mid frequencies - cyan to green
-          const idx = i - numBars / 3
-          barColor = `rgba(0, 255, ${255 - (idx * 255 / (numBars/3))}, 0.9)`
-        } else {
-          // High frequencies - green to yellow
-          const idx = i - 2 * numBars / 3
-          barColor = `rgba(${(idx * 255 / (numBars/3))}, 255, 0, 0.9)`
-        }
+        const x = WIDTH / 2 + Math.cos(angle) * distance
+        const y = HEIGHT / 2 + Math.sin(angle) * distance
         
-        // Draw glow with intensity based on height
-        const glowIntensity = 0.1 + virtualSpectrum[i] * 0.3
-        const glow = ctx.createLinearGradient(0, HEIGHT - height, 0, HEIGHT)
-        glow.addColorStop(0, 'rgba(0, 255, 255, 0)')
-        glow.addColorStop(0.5, `rgba(0, 255, 255, ${glowIntensity})`)
-        glow.addColorStop(1, 'rgba(0, 255, 255, 0.1)')
+        // Size based on audio and position
+        const size = 1 + audioEnergy * 3 * (1 + 0.5 * Math.sin(i + timeRef.current))
         
-        ctx.fillStyle = glow
-        ctx.fillRect(x - 2, HEIGHT - height - 2, barWidth + 4, height + 4)
+        // Color based on position
+        const hue = (i / particleCount) * 120 + 180 // Blue to green
+        const color = `hsla(${hue}, 100%, 70%, ${0.3 + audioEnergy * 0.5})`
         
-        // Draw bar with gradient
-        const gradient = ctx.createLinearGradient(0, HEIGHT - height, 0, HEIGHT)
-        gradient.addColorStop(0, barColor)
-        gradient.addColorStop(1, 'rgba(0, 255, 255, 0.4)')
+        // Draw particle with glow
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size * 2)
+        gradient.addColorStop(0, color)
+        gradient.addColorStop(1, 'rgba(0, 100, 255, 0)')
         
         ctx.fillStyle = gradient
-        ctx.fillRect(x, HEIGHT - height, barWidth, height)
-        
-        // Add highlight at top of bar
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
-        ctx.fillRect(x, HEIGHT - height, barWidth, 2)
-        
-        // Add pulsing effect for more dynamic visualization
-        if (height > HEIGHT * 0.4) {
-          const pulseSize = Math.min(5, height / 15)
-          ctx.beginPath()
-          ctx.arc(x + barWidth / 2, HEIGHT - height - pulseSize, pulseSize, 0, Math.PI * 2)
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
-          ctx.fill()
-        }
-      }
-      
-      // Draw a waveform-like visualization for speech
-      if (visualizationMode === 'waveform' || visualizationMode === 'combined') {
         ctx.beginPath()
-        ctx.lineWidth = 1.5
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.6)'
-        
-        // Create a speech-like waveform
-        const wavePoints = 100
-        const waveHeight = HEIGHT * 0.3
-        const centerY = HEIGHT / 2
-        
-        ctx.moveTo(0, centerY)
-        
-        for (let i = 0; i < wavePoints; i++) {
-          const x = (i / wavePoints) * WIDTH
-          
-          // Combine multiple frequencies for a speech-like pattern
-          // Speech has fundamental frequency (~100-300 Hz) and harmonics
-          const fundamentalFreq = 5 // cycles across the display
-          const secondHarmonic = 10
-          const thirdHarmonic = 15
-          
-          // Amplitude modulation to simulate syllables
-          const syllableAmp = 0.5 + 0.5 * Math.sin(time * syllableRate * Math.PI * 2)
-          
-          // Word and sentence pauses
-          let amplitude = 1.0
-          if (wordBoundary) amplitude *= 0.3
-          if (sentencePause) amplitude *= 0.1
-          
-          // Combine frequencies with decreasing amplitude for harmonics
-          const y = centerY + waveHeight * amplitude * syllableAmp * (
-            0.7 * Math.sin(fundamentalFreq * Math.PI * i / wavePoints + time * 7) +
-            0.2 * Math.sin(secondHarmonic * Math.PI * i / wavePoints + time * 11) +
-            0.1 * Math.sin(thirdHarmonic * Math.PI * i / wavePoints + time * 13)
-          )
-          
-          ctx.lineTo(x, y)
-        }
-        
-        ctx.lineTo(WIDTH, centerY)
-        ctx.stroke()
-        
-        // Add glow effect
-        ctx.lineWidth = 3
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)'
-        ctx.stroke()
+        ctx.arc(x, y, size * 2, 0, Math.PI * 2)
+        ctx.fill()
       }
     }
     
@@ -485,7 +361,7 @@ export default function AudioVisualizer() {
         cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [getAnalyzerData, isPlaying, fallbackMode, visualizationMode])
+  }, [getAnalyzerData, isPlaying, fallbackMode, analyzer])
   
   return (
     <canvas 
