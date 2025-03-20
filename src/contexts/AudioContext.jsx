@@ -474,11 +474,27 @@ export function AudioProvider({ children }) {
         dataArray = new Uint8Array(bufferLength)
         
         // Tone.js returns values in range -100 to 0 (dB), convert to 0-255 range
+        // But we need to handle the case where there's no sound
+        let hasSound = false
+        
         for (let i = 0; i < bufferLength; i++) {
-          // Convert from dB (-100 to 0) to 0-255 range
-          // -100dB maps to 0, 0dB maps to 255
-          const normalized = (values[i] + 100) / 100 // Now 0 to 1
-          dataArray[i] = Math.floor(normalized * 255)
+          // Check if there's any significant audio data
+          if (values[i] > -80) { // -80dB is a reasonable threshold for "silence"
+            hasSound = true
+            break
+          }
+        }
+        
+        if (hasSound) {
+          for (let i = 0; i < bufferLength; i++) {
+            // Convert from dB (-100 to 0) to 0-255 range
+            // -100dB maps to 0, 0dB maps to 255
+            const normalized = (values[i] + 100) / 100 // Now 0 to 1
+            dataArray[i] = Math.floor(normalized * 255)
+          }
+        } else {
+          // If there's no sound, set all values to 0
+          dataArray.fill(0)
         }
       } else {
         // Standard Web Audio API analyzer
