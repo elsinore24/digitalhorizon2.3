@@ -81,8 +81,8 @@ export default function AudioVisualizer() {
         // Scale the height based on the frequency value and position
         const heightMultiplier = 0.4 + (positionFactor * 2.6) // 0.4 at edges, 3.0 at center
         
-        // Calculate height based on frequency data
-        const height = (value / 255) * HEIGHT * 0.8 * heightMultiplier
+        // Calculate height based on frequency data - use full height
+        const height = (value / 255) * HEIGHT * heightMultiplier
         
         // Calculate the center line (vertically)
         const centerY = HEIGHT / 2
