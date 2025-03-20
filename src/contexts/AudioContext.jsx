@@ -238,16 +238,27 @@ export function AudioProvider({ children }) {
     }
   }, [])
 
-  // Play audio using Tone.js for iOS - no fallbacks, improved logging
+  // Play audio using Tone.js for analyzer and HTML5 Audio for sound on iOS
   const playAudioWithTone = useCallback((url, dialogueId, dialogue) => {
     try {
-      console.log('[iOS Tone.js] Starting playback for:', dialogueId)
-      console.log('[iOS Tone.js] Audio URL:', url)
-      console.log('[iOS Tone.js] Tone.js context state:', Tone.context.state)
+      console.log('[iOS Hybrid] Starting playback for:', dialogueId)
+      console.log('[iOS Hybrid] Audio URL:', url)
+      
+      // Create a hidden audio element specifically for iOS playback
+      const iosAudioElement = document.createElement('audio')
+      iosAudioElement.src = url
+      iosAudioElement.crossOrigin = 'anonymous'
+      iosAudioElement.preload = 'auto'
+      iosAudioElement.controls = false
+      iosAudioElement.playsinline = true
+      iosAudioElement.style.display = 'none'
+      document.body.appendChild(iosAudioElement)
+      
+      console.log('[iOS Hybrid] Created HTML5 Audio element for sound playback')
       
       // Make sure Tone.js is started (required for iOS)
       if (Tone.context.state !== 'running') {
-        console.log('[iOS Tone.js] Starting Tone.js context')
+        console.log('[iOS Hybrid] Starting Tone.js context')
         Tone.start()
       }
       
@@ -256,96 +267,124 @@ export function AudioProvider({ children }) {
         try {
           // Ensure Tone.js context is running
           await Tone.start()
-          console.log('[iOS Tone.js] Context started successfully')
+          console.log('[iOS Hybrid] Tone.js context started successfully')
           
-          // Create a player directly with URL
-          console.log('[iOS Tone.js] Creating player with URL:', url)
+          // Create a player directly with URL (for analyzer only)
+          console.log('[iOS Hybrid] Creating Tone.js player with URL:', url)
           const player = new Tone.Player({
             url: url,
             autostart: false,
             loop: false,
+            volume: -100, // Set volume to minimum since we're using HTML5 Audio for sound
             onload: () => {
-              console.log('[iOS Tone.js] Player loaded successfully')
+              console.log('[iOS Hybrid] Tone.js player loaded successfully')
               setCurrentDialogue(dialogue)
               
               // Create an analyzer with default settings
-              console.log('[iOS Tone.js] Creating analyzer')
+              console.log('[iOS Hybrid] Creating analyzer')
               const toneAnalyzer = new Tone.Analyser('fft', 256)
               
-              // Connect the player to the analyzer and then to the destination
-              console.log('[iOS Tone.js] Connecting player to analyzer and destination')
-              
-              // Make sure we're connecting to the destination properly
-              try {
-                // First disconnect any existing connections to avoid issues
-                player.disconnect();
-                
-                // Connect to both the analyzer and the destination
-                // Using fan() to split the signal to both
-                player.fan(Tone.Destination, toneAnalyzer);
-                
-                // Double-check that we're connected to the destination
-                console.log('[iOS Tone.js] Player connected to destination:', 
-                  player.output.numberOfOutputs > 0 ? 'Yes' : 'No');
-              } catch (err) {
-                console.error('[iOS Tone.js] Error connecting player:', err);
-                
-                // Fallback connection method if the fan method fails
-                console.log('[iOS Tone.js] Using fallback connection method');
-                player.connect(Tone.Destination);
-                player.connect(toneAnalyzer);
-              }
+              // Connect the player to the analyzer
+              console.log('[iOS Hybrid] Connecting player to analyzer')
+              player.connect(toneAnalyzer)
               
               // Store the analyzer in our global analyzer variable
               analyzer = toneAnalyzer
               
               // Log analyzer state before playback
-              console.log('[iOS Tone.js] Analyzer created, initial values:', toneAnalyzer.getValue().slice(0, 5))
+              console.log('[iOS Hybrid] Analyzer created, initial values:', toneAnalyzer.getValue().slice(0, 5))
               
-              // Start playback
-              console.log('[iOS Tone.js] Starting playback')
-              player.start()
-              console.log('[iOS Tone.js] Playback started for:', dialogueId)
-              setIsPlaying(true)
-              setCurrentTrack(dialogueId)
+              // Start HTML5 Audio playback
+              console.log('[iOS Hybrid] Starting HTML5 Audio playback')
+              iosAudioElement.play()
+                .then(() => {
+                  console.log('[iOS Hybrid] HTML5 Audio playing successfully')
+                  
+                  // Start Tone.js player for analyzer data
+                  player.start()
+                  console.log('[iOS Hybrid] Tone.js player started for analyzer data')
+                  
+                  setIsPlaying(true)
+                  setCurrentTrack(dialogueId)
+                })
+                .catch(err => {
+                  console.error('[iOS Hybrid] HTML5 Audio play error:', err)
+                  // Try to play Tone.js with sound as fallback
+                  console.log('[iOS Hybrid] Falling back to Tone.js for sound')
+                  player.volume.value = 0 // Reset volume
+                  player.start()
+                  setIsPlaying(true)
+                  setCurrentTrack(dialogueId)
+                })
               
-              // Set up stop handler
+              // Set up stop handlers
+              iosAudioElement.onended = () => {
+                console.log('[iOS Hybrid] HTML5 Audio ended')
+                player.stop()
+                cleanup()
+              }
+              
               player.onstop = () => {
-                console.log('[iOS Tone.js] Audio ended:', dialogueId)
+                console.log('[iOS Hybrid] Tone.js player stopped')
+                if (iosAudioElement.paused || iosAudioElement.ended) {
+                  cleanup()
+                } else {
+                  iosAudioElement.pause()
+                  cleanup()
+                }
+              }
+              
+              // Cleanup function
+              const cleanup = () => {
+                console.log('[iOS Hybrid] Audio ended:', dialogueId)
                 setIsPlaying(false)
                 setCurrentDialogue(null)
+                
+                // Remove the audio element
+                if (iosAudioElement && iosAudioElement.parentNode) {
+                  iosAudioElement.parentNode.removeChild(iosAudioElement)
+                }
               }
               
               // Store the player
               audioRef.current = player
-              
-              // Check analyzer after a short delay to verify it's receiving data
-              setTimeout(() => {
-                if (toneAnalyzer && typeof toneAnalyzer.getValue === 'function') {
-                  const checkValues = toneAnalyzer.getValue();
-                  console.log('[iOS Tone.js] Analyzer values after playback (first 5):', checkValues.slice(0, 5));
-                  
-                  // Check if we're getting any significant values
-                  let maxValue = -100;
-                  for (let i = 0; i < checkValues.length; i++) {
-                    if (checkValues[i] > maxValue) {
-                      maxValue = checkValues[i];
-                    }
-                  }
-                  console.log('[iOS Tone.js] Max analyzer value after playback:', maxValue);
-                }
-              }, 500);
             },
             onerror: (err) => {
-              console.error('[iOS Tone.js] Player error:', err)
-              // No fallback - just log the error
-              console.error('[iOS Tone.js] Failed to play audio with Tone.js')
+              console.error('[iOS Hybrid] Tone.js player error:', err)
+              // Try HTML5 Audio alone
+              console.log('[iOS Hybrid] Trying HTML5 Audio alone')
+              iosAudioElement.play()
+                .then(() => {
+                  console.log('[iOS Hybrid] HTML5 Audio playing successfully')
+                  setIsPlaying(true)
+                  setCurrentTrack(dialogueId)
+                })
+                .catch(audioErr => {
+                  console.error('[iOS Hybrid] HTML5 Audio play error:', audioErr)
+                  // Clean up
+                  if (iosAudioElement && iosAudioElement.parentNode) {
+                    iosAudioElement.parentNode.removeChild(iosAudioElement)
+                  }
+                })
             }
           })
         } catch (err) {
-          console.error('[iOS Tone.js] Error starting Tone.js:', err)
-          // No fallback - just log the error
-          console.error('[iOS Tone.js] Failed to start Tone.js')
+          console.error('[iOS Hybrid] Error starting Tone.js:', err)
+          // Try HTML5 Audio alone
+          console.log('[iOS Hybrid] Trying HTML5 Audio alone after Tone.js error')
+          iosAudioElement.play()
+            .then(() => {
+              console.log('[iOS Hybrid] HTML5 Audio playing successfully')
+              setIsPlaying(true)
+              setCurrentTrack(dialogueId)
+            })
+            .catch(audioErr => {
+              console.error('[iOS Hybrid] HTML5 Audio play error:', audioErr)
+              // Clean up
+              if (iosAudioElement && iosAudioElement.parentNode) {
+                iosAudioElement.parentNode.removeChild(iosAudioElement)
+              }
+            })
         }
       }
       
@@ -354,7 +393,7 @@ export function AudioProvider({ children }) {
       
       return true
     } catch (err) {
-      console.error('[iOS Tone.js] Failed to play audio:', err)
+      console.error('[iOS Hybrid] Failed to play audio:', err)
       return false
     }
   }, [])
