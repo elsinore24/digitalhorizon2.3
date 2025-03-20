@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useDialogue from '../hooks/useDialogue'
+import AudioVisualizer from './AudioVisualizer'
+import useAudio from '../hooks/useAudio'
 import styles from './DialogueSystem.module.scss'
 
 function TypewriterEffect({ text, speed = 30, onComplete }) {
@@ -26,6 +28,7 @@ function TypewriterEffect({ text, speed = 30, onComplete }) {
 export default function DialogueSystem() {
   const { currentDialogue, isDialogueActive, completeDialogue } = useDialogue()
   const [isTyping, setIsTyping] = useState(false)
+  const { isPlaying } = useAudio()
   
   if (!isDialogueActive) return null
   
@@ -38,6 +41,11 @@ export default function DialogueSystem() {
         exit={{ opacity: 0, y: 20 }}
       >
         <div className={styles.dialogueBox}>
+          {isPlaying && (
+            <div className={styles.visualizerContainer}>
+              <AudioVisualizer />
+            </div>
+          )}
           <div className={styles.speakerName}>
             {currentDialogue.speaker}
             <span className={styles.dot}></span>

@@ -299,7 +299,7 @@ export default function AudioVisualizer() {
       ref={canvasRef} 
       className={styles.visualizer}
       width="600"
-      height="120"
+      height="200"
     />
   )
 }
