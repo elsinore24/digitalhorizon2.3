@@ -47,131 +47,75 @@ export default function AudioVisualizer() {
       // Calculate exact center index
       const centerIndex = Math.floor(barCount / 2)
       
-      // For iOS, we'll generate our own visualization data directly
-      if (isIOS && isPlaying) {
-        const time = Date.now() / 1000; // Current time in seconds
+      // Use the analyzer data for all platforms including iOS
+      // Get audio data from analyzer
+      const audioData = getAnalyzerData()
+      
+      // Get audio data from analyzer or use empty array if not available
+      const { dataArray, bufferLength } = audioData || { dataArray: new Uint8Array(128).fill(0), bufferLength: 128 }
+      
+      // Draw the bars
+      for (let i = 0; i < barCount; i++) {
+        const x = startX + i * totalBarWidth
         
-        // Draw the bars
-        for (let i = 0; i < barCount; i++) {
-          const x = startX + i * totalBarWidth
-          
-          // Calculate distance from center (0 at center, increases toward edges)
-          const distanceFromCenter = Math.abs(i - centerIndex)
-          
-          // Calculate normalized distance (0 to 1)
-          const normalizedDistance = distanceFromCenter / centerIndex
-          
-          // Create a bell curve distribution (higher in middle, lower at edges)
-          const bellCurve = Math.exp(-Math.pow(normalizedDistance * 3, 2))
-          
-          // Add time-based variation with multiple frequencies
-          const timeVariation = 
-            Math.sin(time * 2 + i * 0.2) * 0.3 + 
-            Math.sin(time * 1.5 + i * 0.1) * 0.2 + 
-            Math.sin(time * 3 + i * 0.3) * 0.1;
-          
-          // Add some randomness for natural look
-          const randomness = Math.random() * 0.1;
-          
-          // Calculate height based on these factors
-          const heightFactor = bellCurve * 0.7 + timeVariation + randomness;
-          const height = heightFactor * HEIGHT * 0.6;
-          
-          // Calculate the center line (vertically)
-          const centerY = HEIGHT / 2;
-          
-          // Calculate the height for both up and down (half of total height)
-          const halfHeight = height / 2;
-          
-          // Set fill style with gradient
-          const barGradient = ctx.createLinearGradient(0, centerY - halfHeight, 0, centerY + halfHeight);
-          barGradient.addColorStop(0, 'rgba(255, 165, 0, 0.95)'); // Orange/gold at top
-          barGradient.addColorStop(0.5, 'rgba(255, 105, 180, 0.95)'); // Pink in middle
-          barGradient.addColorStop(1, 'rgba(150, 0, 205, 0.95)'); // Purple at bottom
-          
-          ctx.fillStyle = barGradient;
-          
-          // Add glow effect
-          ctx.shadowColor = 'rgba(255, 100, 150, 0.8)';
-          ctx.shadowBlur = 5;
-          
-          // Draw the bar extending both up and down from center
-          ctx.fillRect(x, centerY - halfHeight, barWidth, height);
-          
-          // Reset shadow for next bar
-          ctx.shadowBlur = 0;
+        // Calculate distance from center (0 at center, increases toward edges)
+        const distanceFromCenter = Math.abs(i - centerIndex)
+        
+        // Get frequency data with emphasis on lower frequencies (which are usually more active)
+        // Map bars to frequency data with center bars getting lower frequencies
+        let dataIndex
+        
+        if (distanceFromCenter < 8) {
+          // Center 16 bars - map to the most active lower frequencies (bass/mid)
+          // These are usually in the first third of the frequency data
+          dataIndex = Math.floor((distanceFromCenter / 8) * (bufferLength / 3))
+        } else {
+          // Outer bars - map to higher frequencies
+          const outerPosition = (distanceFromCenter - 8) / (centerIndex - 8)
+          dataIndex = Math.floor((bufferLength / 3) + outerPosition * (bufferLength * 2 / 3))
         }
-      } else {
-        // For non-iOS, use the analyzer data
-        // Get audio data from analyzer
-        const audioData = getAnalyzerData()
         
-        // Get audio data from analyzer or use empty array if not available
-        const { dataArray, bufferLength } = audioData || { dataArray: new Uint8Array(128).fill(0), bufferLength: 128 }
+        // Ensure dataIndex is within bounds
+        const safeIndex = Math.min(Math.max(0, dataIndex), bufferLength - 1)
         
-        // Draw the bars
-        for (let i = 0; i < barCount; i++) {
-          const x = startX + i * totalBarWidth
-          
-          // Calculate distance from center (0 at center, increases toward edges)
-          const distanceFromCenter = Math.abs(i - centerIndex)
-          
-          // Get frequency data with emphasis on lower frequencies (which are usually more active)
-          // Map bars to frequency data with center bars getting lower frequencies
-          let dataIndex
-          
-          if (distanceFromCenter < 8) {
-            // Center 16 bars - map to the most active lower frequencies (bass/mid)
-            // These are usually in the first third of the frequency data
-            dataIndex = Math.floor((distanceFromCenter / 8) * (bufferLength / 3))
-          } else {
-            // Outer bars - map to higher frequencies
-            const outerPosition = (distanceFromCenter - 8) / (centerIndex - 8)
-            dataIndex = Math.floor((bufferLength / 3) + outerPosition * (bufferLength * 2 / 3))
-          }
-          
-          // Ensure dataIndex is within bounds
-          const safeIndex = Math.min(Math.max(0, dataIndex), bufferLength - 1)
-          
-          // Get the frequency value
-          const value = dataArray[safeIndex]
-          
-          // Calculate position factor for dome shape (1 at center, 0 at edges)
-          const normalizedDistance = distanceFromCenter / centerIndex
-          const positionFactor = Math.max(0, 1 - Math.pow(normalizedDistance, 1.5))
-          
-          // Scale the height based on the frequency value and position
-          // Reduced multiplier range for smaller bars
-          const heightMultiplier = 0.2 + (positionFactor * 1.8) // 0.2 at edges, 2.0 at center
-          
-          // Calculate height based on frequency data with overall scaling factor
-          const height = (value / 255) * HEIGHT * heightMultiplier * 0.6 // Added 0.6 scaling factor to reduce overall height
-          
-          // Calculate the center line (vertically)
-          const centerY = HEIGHT / 2
-          
-          // Calculate the height for both up and down (half of total height)
-          const halfHeight = height / 2
-          
-          // Set fill style with gradient
-          // Create a gradient that goes from center outward in both directions
-          const barGradient = ctx.createLinearGradient(0, centerY - halfHeight, 0, centerY + halfHeight)
-          barGradient.addColorStop(0, 'rgba(255, 165, 0, 0.95)') // Orange/gold at top
-          barGradient.addColorStop(0.5, 'rgba(255, 105, 180, 0.95)') // Pink in middle
-          barGradient.addColorStop(1, 'rgba(150, 0, 205, 0.95)') // Purple at bottom
-          
-          ctx.fillStyle = barGradient
-          
-          // Add glow effect
-          ctx.shadowColor = 'rgba(255, 100, 150, 0.8)'
-          ctx.shadowBlur = 5
-          
-          // Draw the bar extending both up and down from center
-          ctx.fillRect(x, centerY - halfHeight, barWidth, height)
-          
-          // Reset shadow for next bar
-          ctx.shadowBlur = 0
-        }
+        // Get the frequency value
+        const value = dataArray[safeIndex]
+        
+        // Calculate position factor for dome shape (1 at center, 0 at edges)
+        const normalizedDistance = distanceFromCenter / centerIndex
+        const positionFactor = Math.max(0, 1 - Math.pow(normalizedDistance, 1.5))
+        
+        // Scale the height based on the frequency value and position
+        // Reduced multiplier range for smaller bars
+        const heightMultiplier = 0.2 + (positionFactor * 1.8) // 0.2 at edges, 2.0 at center
+        
+        // Calculate height based on frequency data with overall scaling factor
+        const height = (value / 255) * HEIGHT * heightMultiplier * 0.6 // Added 0.6 scaling factor to reduce overall height
+        
+        // Calculate the center line (vertically)
+        const centerY = HEIGHT / 2
+        
+        // Calculate the height for both up and down (half of total height)
+        const halfHeight = height / 2
+        
+        // Set fill style with gradient
+        // Create a gradient that goes from center outward in both directions
+        const barGradient = ctx.createLinearGradient(0, centerY - halfHeight, 0, centerY + halfHeight)
+        barGradient.addColorStop(0, 'rgba(255, 165, 0, 0.95)') // Orange/gold at top
+        barGradient.addColorStop(0.5, 'rgba(255, 105, 180, 0.95)') // Pink in middle
+        barGradient.addColorStop(1, 'rgba(150, 0, 205, 0.95)') // Purple at bottom
+        
+        ctx.fillStyle = barGradient
+        
+        // Add glow effect
+        ctx.shadowColor = 'rgba(255, 100, 150, 0.8)'
+        ctx.shadowBlur = 5
+        
+        // Draw the bar extending both up and down from center
+        ctx.fillRect(x, centerY - halfHeight, barWidth, height)
+        
+        // Reset shadow for next bar
+        ctx.shadowBlur = 0
       }
       
       // Request next frame
