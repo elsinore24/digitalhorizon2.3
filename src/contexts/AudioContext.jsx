@@ -12,8 +12,21 @@ let analyzer = null
 const initAudioContext = () => {
   if (!analyzer && window.Howler) {
     try {
+      // Ensure Howler is fully initialized
+      if (!Howler.ctx) {
+        // Create a dummy sound to force Howler to initialize its audio context
+        const dummy = new Howl({
+          src: ['/audio/dummy.mp3'],
+          preload: false,
+          volume: 0
+        });
+        
+        // Touch the audio context to initialize it
+        Howler.ctx = Howler.ctx || new (window.AudioContext || window.webkitAudioContext)();
+      }
+      
       // Get Howler's audio context
-      const audioCtx = Howler.ctx
+      const audioCtx = Howler.ctx;
       
       // Check if audioCtx is available
       if (!audioCtx) {
@@ -176,7 +189,34 @@ export function AudioProvider({ children }) {
 
   // Initialize the audio context when the component mounts
   useEffect(() => {
-    const { analyzer: newAnalyzer } = initAudioContext()
+    // Try to initialize immediately
+    let { analyzer: newAnalyzer } = initAudioContext()
+    
+    // If initialization failed, retry after a short delay
+    // This gives Howler time to fully initialize
+    if (!newAnalyzer) {
+      const initTimer = setTimeout(() => {
+        const result = initAudioContext()
+        if (!result.analyzer) {
+          console.warn('Failed to initialize audio analyzer after retry')
+        }
+      }, 500)
+      
+      return () => {
+        clearTimeout(initTimer)
+        // Clean up if needed
+        if (analyzer && Howler.ctx && Howler.masterGain) {
+          try {
+            // Reconnect Howler's masterGain directly to destination
+            Howler.masterGain.disconnect()
+            Howler.masterGain.connect(Howler.ctx.destination)
+            console.log('Cleaned up audio analyzer connections')
+          } catch (err) {
+            console.error('Error cleaning up audio connections:', err)
+          }
+        }
+      }
+    }
     
     return () => {
       // Clean up if needed

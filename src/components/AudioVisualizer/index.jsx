@@ -87,23 +87,65 @@ export default function AudioVisualizer() {
           setFallbackMode(true)
         }
       } else {
-        // Fallback to animated bars if no analyzer data or not playing
+        // Enhanced fallback visualization that simulates frequency spectrum
         const time = Date.now() / 1000
         
+        // Create a virtual frequency spectrum with more realistic behavior
+        const virtualSpectrum = []
+        
+        // Generate a more realistic frequency distribution
+        // Low frequencies (bass) have higher amplitude and slower changes
+        // High frequencies have lower amplitude and faster changes
         for (let i = 0; i < numBars; i++) {
-          // Calculate bar height using multiple sine waves for more interesting motion
-          const height = HEIGHT * 0.8 * (
-            0.5 + 
-            0.3 * Math.sin(time * 4 + i) +
-            0.2 * Math.sin(time * 2.5 + i * 0.5)
-          ) * (isPlaying ? 1 : 0.3) // Reduce height when not playing
+          // Base amplitude decreases as frequency (i) increases
+          const baseAmplitude = 0.8 - (i / numBars) * 0.3
           
+          // Different oscillation speeds for different frequency bands
+          const oscillationSpeed = 1.5 + (i / numBars) * 3
+          
+          // Phase shift based on position to create wave-like motion
+          const phaseShift = i * 0.7
+          
+          // Add some randomness for more natural look
+          const noise = 0.05 * Math.sin(time * 10 + i * 20)
+          
+          // Combine multiple oscillations with different frequencies
+          let value = baseAmplitude * (
+            0.6 * Math.sin(time * oscillationSpeed + phaseShift) +
+            0.3 * Math.sin(time * oscillationSpeed * 1.7 + phaseShift * 1.3) +
+            0.1 * Math.sin(time * oscillationSpeed * 3.1 + phaseShift * 0.5) +
+            noise
+          )
+          
+          // Ensure value is positive and within range
+          value = Math.abs(value)
+          value = Math.min(1, Math.max(0.05, value))
+          
+          // Apply playing state - more active when playing
+          value = value * (isPlaying ? 1 : 0.3)
+          
+          virtualSpectrum.push(value)
+        }
+        
+        // Apply some smoothing between adjacent bars for more natural look
+        for (let i = 1; i < numBars - 1; i++) {
+          virtualSpectrum[i] = (
+            virtualSpectrum[i-1] * 0.2 + 
+            virtualSpectrum[i] * 0.6 + 
+            virtualSpectrum[i+1] * 0.2
+          )
+        }
+        
+        // Draw the bars using the virtual spectrum
+        for (let i = 0; i < numBars; i++) {
+          const height = HEIGHT * 0.8 * virtualSpectrum[i]
           const x = spacing + i * (barWidth + spacing)
           
-          // Draw glow
+          // Draw glow with intensity based on height
+          const glowIntensity = 0.1 + virtualSpectrum[i] * 0.3
           const glow = ctx.createLinearGradient(0, HEIGHT - height, 0, HEIGHT)
           glow.addColorStop(0, 'rgba(0, 255, 255, 0)')
-          glow.addColorStop(0.5, 'rgba(0, 255, 255, 0.3)')
+          glow.addColorStop(0.5, `rgba(0, 255, 255, ${glowIntensity})`)
           glow.addColorStop(1, 'rgba(0, 255, 255, 0.1)')
           
           ctx.fillStyle = glow
