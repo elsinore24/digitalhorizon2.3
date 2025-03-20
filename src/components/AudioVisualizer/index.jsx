@@ -294,11 +294,29 @@ export default function AudioVisualizer() {
     }
   }, [getAnalyzerData, isPlaying, fallbackMode, analyzer])
   
+  useEffect(() => {
+    // Function to resize canvas to match window width
+    const resizeCanvas = () => {
+      if (!canvasRef.current) return
+      const canvas = canvasRef.current
+      canvas.width = window.innerWidth
+      canvas.height = 200
+    }
+    
+    // Initial resize
+    resizeCanvas()
+    
+    // Add resize event listener
+    window.addEventListener('resize', resizeCanvas)
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', resizeCanvas)
+  }, [])
+  
   return (
     <canvas 
       ref={canvasRef} 
       className={styles.visualizer}
-      width="600"
       height="200"
     />
   )

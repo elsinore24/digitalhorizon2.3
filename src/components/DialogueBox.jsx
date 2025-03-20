@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import AudioVisualizer from './AudioVisualizer'
 import useAudio from '../hooks/useAudio'
 import styles from './DialogueBox.module.scss'
 
@@ -40,11 +39,6 @@ export default function DialogueBox({ dialogue, onComplete }) {
 
   return (
     <div className={styles.dialogueBox}>
-      {isPlaying && (
-        <div className={styles.visualizerContainer}>
-          <AudioVisualizer />
-        </div>
-      )}
       <div className={styles.header}>
         <div className={styles.speaker}>{dialogue.speaker}</div>
       </div>
