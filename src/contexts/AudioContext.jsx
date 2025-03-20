@@ -249,40 +249,52 @@ export function AudioProvider({ children }) {
         Tone.start()
       }
       
-      // Create a player
-      const player = new Tone.Player({
-        url: url,
-        autostart: false,
-        onload: () => {
-          console.log('Audio loaded (Tone.js):', dialogueId)
+      // Create a buffer to load the audio
+      const buffer = new Tone.Buffer(url, () => {
+        console.log('Audio buffer loaded (Tone.js):', dialogueId)
+        
+        try {
+          // Create a player with the loaded buffer
+          const player = new Tone.Player(buffer).toDestination()
+          
+          // Create an analyzer
+          const toneAnalyzer = new Tone.Analyser('fft', 256)
+          
+          // Connect the player to the analyzer
+          player.connect(toneAnalyzer)
+          
+          // Store the analyzer in our global analyzer variable
+          analyzer = toneAnalyzer
+          
+          // Set up stop handler
+          player.onstop = () => {
+            console.log('Audio ended (Tone.js):', dialogueId)
+            setIsPlaying(false)
+            setCurrentDialogue(null)
+          }
+          
+          // Start playback
+          player.start()
+          console.log('Audio playing (Tone.js):', dialogueId)
+          setIsPlaying(true)
+          setCurrentTrack(dialogueId)
           setCurrentDialogue(dialogue)
+          
+          // Store the player
+          audioRef.current = player
+        } catch (err) {
+          console.error('Error playing loaded buffer with Tone.js:', err)
+          // Fall back to Howler
+          console.log('Falling back to Howler due to Tone.js error')
+          playAudioWithHowler(url, dialogueId, dialogue)
         }
-      }).toDestination()
-      
-      // Create an analyzer
-      const toneAnalyzer = new Tone.Analyser('fft', 256)
-      
-      // Connect the player to the analyzer
-      player.connect(toneAnalyzer)
-      
-      // Store the analyzer in our global analyzer variable
-      analyzer = toneAnalyzer
-      
-      // Play the audio when it's loaded
-      player.onstop = () => {
-        console.log('Audio ended (Tone.js):', dialogueId)
-        setIsPlaying(false)
-        setCurrentDialogue(null)
-      }
-      
-      // Start playback
-      player.start()
-      console.log('Audio playing (Tone.js):', dialogueId)
-      setIsPlaying(true)
-      setCurrentTrack(dialogueId)
-      
-      // Store the player
-      audioRef.current = player
+      }, (err) => {
+        // Buffer loading error
+        console.error('Error loading audio buffer with Tone.js:', err)
+        // Fall back to Howler
+        console.log('Falling back to Howler due to Tone.js buffer loading error')
+        playAudioWithHowler(url, dialogueId, dialogue)
+      })
       
       return true
     } catch (err) {
@@ -412,10 +424,10 @@ export function AudioProvider({ children }) {
       const localUrl = getAudioUrl(`${dialogueId}.mp3`)
       console.log('Using local audio URL to avoid CORS:', localUrl)
 
-      // For iOS, use Tone.js which has better iOS compatibility and analyzer support
+      // For iOS, use Howler.js which has better iOS compatibility
       if (isIOS) {
-        console.log('Using Tone.js for iOS playback')
-        playAudioWithTone(localUrl, dialogueId, dialogue)
+        console.log('Using Howler for iOS playback')
+        playAudioWithHowler(localUrl, dialogueId, dialogue)
       } else {
         // Try to play using the audio element first
         const elementSuccess = playAudioWithElement(localUrl, dialogueId, dialogue)
