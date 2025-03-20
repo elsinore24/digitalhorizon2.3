@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import useAudio from '../../hooks/useAudio'
 import styles from './AudioVisualizer.module.scss'
@@ -6,35 +6,26 @@ import styles from './AudioVisualizer.module.scss'
 export default function WaveSurferVisualizer() {
   const containerRef = useRef(null)
   const wavesurferRef = useRef(null)
-  const { isPlaying, currentTrack, getAudioInstance } = useAudio()
-  const [isIOS, setIsIOS] = useState(false)
-  
-  // Check if we're on iOS
-  useEffect(() => {
-    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream)
-  }, [])
+  const { isPlaying, currentTrack } = useAudio()
   
   // Initialize WaveSurfer
   useEffect(() => {
     if (!containerRef.current) return
     
-    // Create WaveSurfer instance
+    // Create WaveSurfer instance with simpler configuration
     const wavesurfer = WaveSurfer.create({
       container: containerRef.current,
-      waveColor: 'rgba(255, 105, 180, 0.8)', // Pink
-      progressColor: 'rgba(255, 165, 0, 0.95)', // Orange/gold
+      waveColor: '#ff69b4', // Pink
+      progressColor: '#ffa500', // Orange
       cursorColor: 'transparent',
       barWidth: 2,
       barGap: 1,
-      barRadius: 3,
       height: 400,
-      normalize: true,
       responsive: true,
+      normalize: true,
       fillParent: true,
-      interact: false, // Disable user interaction
+      interact: false,
       hideScrollbar: true,
-      partialRender: true,
-      pixelRatio: 1,
     })
     
     // Store the WaveSurfer instance
@@ -52,64 +43,45 @@ export default function WaveSurferVisualizer() {
   useEffect(() => {
     if (!wavesurferRef.current || !currentTrack) return
     
-    const audioUrl = `/audio/narration/${currentTrack}.mp3`
-    console.log('[WaveSurfer] Loading audio:', audioUrl)
-    
-    // Load the audio file
-    wavesurferRef.current.load(audioUrl)
-    
-    // Set up event listeners
-    wavesurferRef.current.on('ready', () => {
-      console.log('[WaveSurfer] Audio ready')
+    try {
+      const audioUrl = `/audio/narration/${currentTrack}.mp3`
+      console.log('[WaveSurfer] Loading audio:', audioUrl)
       
-      // Apply gradient to waveform
-      const gradient = wavesurferRef.current.backend.canvasCtx.createLinearGradient(
-        0, 0, 0, wavesurferRef.current.backend.height
-      )
-      gradient.addColorStop(0, 'rgba(255, 165, 0, 0.95)') // Orange/gold at top
-      gradient.addColorStop(0.3, 'rgba(255, 105, 180, 0.95)') // Pink in middle
-      gradient.addColorStop(1, 'rgba(150, 0, 205, 0.95)') // Purple at bottom
+      // Load the audio file
+      wavesurferRef.current.load(audioUrl)
       
-      wavesurferRef.current.setWaveColor(gradient)
+      // Set up event listeners
+      wavesurferRef.current.on('ready', () => {
+        console.log('[WaveSurfer] Audio ready')
+        
+        // Start playing if isPlaying is true
+        if (isPlaying) {
+          wavesurferRef.current.play()
+        }
+      })
       
-      // Start playing if isPlaying is true
-      if (isPlaying) {
-        wavesurferRef.current.play()
-      }
-    })
-    
-    wavesurferRef.current.on('error', (err) => {
-      console.error('[WaveSurfer] Error:', err)
-    })
-    
-  }, [currentTrack])
+      wavesurferRef.current.on('error', (err) => {
+        console.error('[WaveSurfer] Error:', err)
+      })
+    } catch (err) {
+      console.error('[WaveSurfer] Error loading audio:', err)
+    }
+  }, [currentTrack, isPlaying])
   
   // Control playback based on isPlaying state
   useEffect(() => {
-    if (!wavesurferRef.current || !wavesurferRef.current.isReady) return
+    if (!wavesurferRef.current) return
     
-    if (isPlaying) {
-      wavesurferRef.current.play()
-    } else {
-      wavesurferRef.current.pause()
+    try {
+      if (isPlaying && wavesurferRef.current.isReady) {
+        wavesurferRef.current.play()
+      } else if (wavesurferRef.current.isPlaying()) {
+        wavesurferRef.current.pause()
+      }
+    } catch (err) {
+      console.error('[WaveSurfer] Error controlling playback:', err)
     }
   }, [isPlaying])
-  
-  // Resize handler
-  useEffect(() => {
-    const handleResize = () => {
-      if (wavesurferRef.current) {
-        wavesurferRef.current.empty()
-        wavesurferRef.current.drawBuffer()
-      }
-    }
-    
-    window.addEventListener('resize', handleResize)
-    
-    return () => {
-      window.removeEventListener('resize', handleResize)
-    }
-  }, [])
   
   return (
     <div 
