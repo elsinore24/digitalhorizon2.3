@@ -529,9 +529,9 @@ export function AudioProvider({ children }) {
         
         if (hasSound) {
           // Implement a fixed noise gate threshold for background noise
-          // Based on observed values, background noise is typically around -80 to -90 dB
+          // Based on observed values, background noise is typically around -60 to -70 dB
           // Set a threshold that's higher than typical background noise
-          const noiseGateThreshold = -75; // Only allow signals stronger than -75dB
+          const noiseGateThreshold = -55; // Only allow signals stronger than -55dB
           
           console.log('[iOS Tone.js Analyzer] Using fixed noise gate threshold:', noiseGateThreshold, 'dB');
           
