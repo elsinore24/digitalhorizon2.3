@@ -44,35 +44,44 @@ export default function AudioVisualizer() {
       const totalWidth = barCount * totalBarWidth
       const startX = Math.floor((WIDTH - totalWidth) / 2)
       
-      // Debug centering
-      if (isPlaying) {
-        console.log(`Canvas width: ${WIDTH}, Total bars width: ${totalWidth}, Start X: ${startX}`)
-      }
-      
       // Draw the bars
       for (let i = 0; i < barCount; i++) {
         const x = startX + i * totalBarWidth
         
-        // Get the frequency value (0-255)
-        // Use a subset of the frequency data
-        const dataIndex = Math.floor(i * (bufferLength / barCount))
+        // Calculate exact center index
+        const centerIndex = Math.floor(barCount / 2)
+        
+        // Calculate distance from center (0 at center, increases toward edges)
+        const distanceFromCenter = Math.abs(i - centerIndex)
+        
+        // Get frequency data with emphasis on lower frequencies (which are usually more active)
+        // Map bars to frequency data with center bars getting lower frequencies
+        let dataIndex
+        
+        if (distanceFromCenter < 8) {
+          // Center 16 bars - map to the most active lower frequencies (bass/mid)
+          // These are usually in the first third of the frequency data
+          dataIndex = Math.floor((distanceFromCenter / 8) * (bufferLength / 3))
+        } else {
+          // Outer bars - map to higher frequencies
+          const outerPosition = (distanceFromCenter - 8) / (centerIndex - 8)
+          dataIndex = Math.floor((bufferLength / 3) + outerPosition * (bufferLength * 2 / 3))
+        }
         
         // Ensure dataIndex is within bounds
-        const safeIndex = Math.min(dataIndex, bufferLength - 1)
+        const safeIndex = Math.min(Math.max(0, dataIndex), bufferLength - 1)
         
-        // Get the frequency value without artificial minimums
+        // Get the frequency value
         const value = dataArray[safeIndex]
         
-        // Calculate position factor - 0 at edges, 1 at center
-        // Use a simple parabolic function for the dome shape
-        const normalizedPosition = i / (barCount - 1) // 0 to 1
-        const positionFactor = 1 - 4 * Math.pow(normalizedPosition - 0.5, 2) // Parabola: 1 at center, 0 at edges
+        // Calculate position factor for dome shape (1 at center, 0 at edges)
+        const normalizedDistance = distanceFromCenter / centerIndex
+        const positionFactor = Math.max(0, 1 - Math.pow(normalizedDistance, 1.5))
         
         // Scale the height based on the frequency value and position
-        // Make center bars taller by multiplying by the position factor
-        const heightMultiplier = 0.5 + (positionFactor * 2.5) // 0.5 at edges, 3.0 at center
+        const heightMultiplier = 0.4 + (positionFactor * 2.6) // 0.4 at edges, 3.0 at center
         
-        // Calculate height based only on frequency data
+        // Calculate height based on frequency data
         const height = (value / 255) * HEIGHT * 0.8 * heightMultiplier
         
         // Set fill style with gradient
