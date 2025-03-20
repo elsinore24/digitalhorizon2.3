@@ -84,15 +84,27 @@ export default function AudioVisualizer() {
         // Calculate height based on frequency data
         const height = (value / 255) * HEIGHT * 0.8 * heightMultiplier
         
+        // Calculate the center line (vertically)
+        const centerY = HEIGHT / 2
+        
+        // Calculate the height for both up and down (half of total height)
+        const halfHeight = height / 2
+        
         // Set fill style with gradient
-        ctx.fillStyle = gradient
+        // Create a gradient that goes from center outward in both directions
+        const barGradient = ctx.createLinearGradient(0, centerY - halfHeight, 0, centerY + halfHeight)
+        barGradient.addColorStop(0, 'rgba(255, 165, 0, 0.95)') // Orange/gold at top
+        barGradient.addColorStop(0.5, 'rgba(255, 105, 180, 0.95)') // Pink in middle
+        barGradient.addColorStop(1, 'rgba(150, 0, 205, 0.95)') // Purple at bottom
+        
+        ctx.fillStyle = barGradient
         
         // Add glow effect
         ctx.shadowColor = 'rgba(255, 100, 150, 0.8)'
         ctx.shadowBlur = 5
         
-        // Draw the bar from bottom up
-        ctx.fillRect(x, HEIGHT - height, barWidth, height)
+        // Draw the bar extending both up and down from center
+        ctx.fillRect(x, centerY - halfHeight, barWidth, height)
         
         // Reset shadow for next bar
         ctx.shadowBlur = 0
