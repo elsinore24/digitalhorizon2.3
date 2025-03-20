@@ -69,34 +69,23 @@ export default function AudioVisualizer() {
         // Ensure dataIndex is within bounds
         dataIndex = Math.min(dataIndex, bufferLength - 1)
         
-        // Get value and add some randomness to make inactive bars appear active
-        let value = dataArray[dataIndex]
-        
-        // Add randomness to low values to ensure all bars show some activity
-        if (value < 30) {
-          value = Math.max(value, 10 + Math.random() * 20)
-        }
+        // Get the frequency value without artificial minimums
+        const value = dataArray[dataIndex]
         
         // Calculate position factor - 0 at edges, 1 at center
-        // Calculate distance from center bar (which should be at barCount/2)
-        // This ensures perfect symmetry around the center
         const centerBarIndex = Math.floor(barCount / 2)
         const distanceFromCenter = Math.abs(i - centerBarIndex) / centerBarIndex
         const positionFactor = 1 - distanceFromCenter
         
-        // Apply power function to create steeper dome effect
-        const enhancedPositionFactor = Math.pow(positionFactor, 2.5) // Adjusted power for balanced dome
+        // Apply power function to create dome effect
+        const enhancedPositionFactor = Math.pow(positionFactor, 2) // Quadratic for natural dome
         
         // Scale the height based on the frequency value and position
-        const heightMultiplier = 0.25 + (enhancedPositionFactor * 3.75) // 0.25 at edges, 4.0 at center
+        const heightMultiplier = 0.3 + (enhancedPositionFactor * 2.7) // 0.3 at edges, 3.0 at center
         
-        // Force the dome shape to be more prominent than the frequency data
-        // This ensures the dome shape is always visible regardless of frequency content
-        const baseHeight = HEIGHT * 0.12 * enhancedPositionFactor // Base dome shape
-        const frequencyHeight = (value / 255) * HEIGHT * 0.68 * heightMultiplier // Frequency-based height
-        
-        // Combine base dome shape with frequency data
-        const height = baseHeight + frequencyHeight
+        // Calculate height based only on frequency data
+        // No base height to ensure bars reduce to zero when no audio is present
+        const height = (value / 255) * HEIGHT * 0.8 * heightMultiplier
         
         // Set fill style with gradient
         ctx.fillStyle = gradient
