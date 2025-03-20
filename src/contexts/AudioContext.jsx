@@ -5,57 +5,68 @@ import { supabase } from '../config/supabase'
 
 export const AudioContext = createContext(null)
 
-// Create Web Audio API context and analyzer
+// Create our own Web Audio API context and analyzer
+let audioContext = null
 let analyzer = null
+let mediaStreamSource = null
+let audioElement = null
+let audioStream = null
 
-// Initialize Web Audio API context and connect to Howler
+// Initialize Web Audio API context with direct audio capture
 const initAudioContext = () => {
-  if (!analyzer && window.Howler) {
+  if (!analyzer) {
     try {
-      // Ensure Howler is fully initialized
-      if (!Howler.ctx) {
-        // Create a dummy sound to force Howler to initialize its audio context
-        const dummy = new Howl({
-          src: ['/audio/dummy.mp3'],
-          preload: false,
-          volume: 0
-        });
-        
-        // Touch the audio context to initialize it
-        Howler.ctx = Howler.ctx || new (window.AudioContext || window.webkitAudioContext)();
-      }
-      
-      // Get Howler's audio context
-      const audioCtx = Howler.ctx;
-      
-      // Check if audioCtx is available
-      if (!audioCtx) {
-        console.warn('Howler audio context is not available')
-        return { analyzer: null }
-      }
+      // Create our own audio context
+      audioContext = new (window.AudioContext || window.webkitAudioContext)()
       
       // Create analyzer node
-      analyzer = audioCtx.createAnalyser()
+      analyzer = audioContext.createAnalyser()
       analyzer.fftSize = 256
       analyzer.smoothingTimeConstant = 0.8
       
-      // Connect Howler's masterGain to our analyzer
-      if (Howler.masterGain) {
-        // Connect analyzer between masterGain and destination
-        Howler.masterGain.disconnect()
-        Howler.masterGain.connect(analyzer)
-        analyzer.connect(audioCtx.destination)
-        
-        console.log('Successfully connected analyzer to Howler audio context')
-      } else {
-        console.error('Could not access Howler.masterGain')
-      }
+      console.log('Successfully created audio analyzer')
+      
+      // We'll connect the analyzer to the audio source when audio starts playing
     } catch (err) {
       console.error('Error initializing audio analyzer:', err)
       analyzer = null
     }
   }
   return { analyzer }
+}
+
+// Function to connect analyzer to audio output
+const connectAnalyzerToAudio = () => {
+  if (!analyzer || !audioContext) return false
+  
+  try {
+    // Create a MediaElementAudioSourceNode if we have an audio element
+    if (audioElement) {
+      // Disconnect any existing connections
+      if (mediaStreamSource) {
+        try {
+          mediaStreamSource.disconnect()
+        } catch (e) {
+          // Ignore disconnection errors
+        }
+      }
+      
+      // Create a new source from the audio element
+      mediaStreamSource = audioContext.createMediaElementSource(audioElement)
+      
+      // Connect the source to the analyzer and then to the destination
+      mediaStreamSource.connect(analyzer)
+      analyzer.connect(audioContext.destination)
+      
+      console.log('Directly connected analyzer to audio element')
+      return true
+    }
+    
+    return false
+  } catch (err) {
+    console.error('Error connecting analyzer to audio:', err)
+    return false
+  }
 }
 
 const AUDIO_BUCKET = 'narration-audio'
@@ -79,6 +90,60 @@ export function AudioProvider({ children }) {
     return audioRef.current
   }, [])
 
+  // Initialize the audio context when the component mounts
+  useEffect(() => {
+    // Initialize audio context
+    initAudioContext()
+    
+    // Set up audio element for capturing
+    if (typeof window !== 'undefined') {
+      // Create a hidden audio element for capturing
+      audioElement = document.createElement('audio')
+      audioElement.id = 'audio-visualizer-source'
+      audioElement.style.display = 'none'
+      document.body.appendChild(audioElement)
+      
+      // Resume audio context on user interaction (required by browsers)
+      const resumeAudioContext = () => {
+        if (audioContext && audioContext.state === 'suspended') {
+          audioContext.resume()
+        }
+        
+        // Remove event listeners after first interaction
+        document.removeEventListener('click', resumeAudioContext)
+        document.removeEventListener('touchstart', resumeAudioContext)
+        document.removeEventListener('keydown', resumeAudioContext)
+      }
+      
+      document.addEventListener('click', resumeAudioContext)
+      document.addEventListener('touchstart', resumeAudioContext)
+      document.addEventListener('keydown', resumeAudioContext)
+    }
+    
+    return () => {
+      // Clean up
+      if (mediaStreamSource) {
+        try {
+          mediaStreamSource.disconnect()
+        } catch (e) {
+          // Ignore disconnection errors
+        }
+      }
+      
+      if (audioElement && audioElement.parentNode) {
+        audioElement.parentNode.removeChild(audioElement)
+      }
+      
+      if (audioContext) {
+        try {
+          audioContext.close()
+        } catch (e) {
+          // Ignore close errors
+        }
+      }
+    }
+  }, [])
+
   // Fallback function to handle CORS errors by using a local audio file
   const playLocalAudio = useCallback((dialogueId, dialogue) => {
     console.log('Attempting to play local audio as fallback for:', dialogueId)
@@ -88,31 +153,65 @@ export function AudioProvider({ children }) {
       const localUrl = `/audio/narration/${dialogueId}.mp3`
       console.log('Local audio URL:', localUrl)
       
-      const audio = new Howl({
-        src: [localUrl],
-        html5: true,
-        preload: true,
-        onload: () => {
+      // Update the audio element source
+      if (audioElement) {
+        audioElement.src = localUrl
+        audioElement.onloadeddata = () => {
           console.log('Local audio loaded:', dialogueId)
           setCurrentDialogue(dialogue)
-        },
-        onplay: () => {
-          console.log('Local audio playing:', dialogueId)
-          setIsPlaying(true)
-          setCurrentTrack(dialogueId)
-        },
-        onend: () => {
+          
+          // Connect analyzer to the audio element
+          connectAnalyzerToAudio()
+          
+          // Play the audio
+          audioElement.play()
+            .then(() => {
+              console.log('Local audio playing:', dialogueId)
+              setIsPlaying(true)
+              setCurrentTrack(dialogueId)
+            })
+            .catch(err => {
+              console.error('Error playing local audio:', err)
+            })
+        }
+        
+        audioElement.onended = () => {
           console.log('Local audio ended:', dialogueId)
           setIsPlaying(false)
           setCurrentDialogue(null)
-        },
-        onloaderror: (id, err) => {
-          console.error('Local audio load error:', dialogueId, err)
         }
-      })
-      
-      audio.play()
-      audioRef.current = audio
+        
+        audioElement.onerror = (err) => {
+          console.error('Local audio error:', err)
+        }
+      } else {
+        // Fallback to Howler if audio element is not available
+        const audio = new Howl({
+          src: [localUrl],
+          html5: true,
+          preload: true,
+          onload: () => {
+            console.log('Local audio loaded (Howler):', dialogueId)
+            setCurrentDialogue(dialogue)
+          },
+          onplay: () => {
+            console.log('Local audio playing (Howler):', dialogueId)
+            setIsPlaying(true)
+            setCurrentTrack(dialogueId)
+          },
+          onend: () => {
+            console.log('Local audio ended (Howler):', dialogueId)
+            setIsPlaying(false)
+            setCurrentDialogue(null)
+          },
+          onloaderror: (id, err) => {
+            console.error('Local audio load error (Howler):', dialogueId, err)
+          }
+        })
+        
+        audio.play()
+        audioRef.current = audio
+      }
     } catch (err) {
       console.error('Failed to play local audio:', err)
     }
@@ -120,6 +219,12 @@ export function AudioProvider({ children }) {
 
   const playNarration = useCallback(async (dialogueId) => {
     try {
+      // Stop any currently playing audio
+      if (audioElement) {
+        audioElement.pause()
+        audioElement.currentTime = 0
+      }
+      
       if (audioRef.current) {
         audioRef.current.stop()
       }
@@ -135,125 +240,97 @@ export function AudioProvider({ children }) {
       const audioUrl = getAudioUrl(`${dialogueId}.mp3`)
       console.log('Audio URL:', audioUrl)
 
-      const audio = new Howl({
-        src: [audioUrl],
-        html5: true,
-        preload: true,
-        format: ['mp3'],
-        xhr: {
-          method: 'GET',
-          headers: {
-            'Origin': window.location.origin,
-            'Range': 'bytes=0-',
-          },
-          withCredentials: false
-        },
-        onload: () => {
+      // Try to play using the audio element first
+      if (audioElement) {
+        audioElement.src = audioUrl
+        audioElement.onloadeddata = () => {
           console.log('Audio loaded:', dialogueId)
           setCurrentDialogue(dialogue)
-        },
-        onplay: () => {
-          console.log('Audio playing:', dialogueId)
-          setIsPlaying(true)
-          setCurrentTrack(dialogueId)
-        },
-        onend: () => {
+          
+          // Connect analyzer to the audio element
+          connectAnalyzerToAudio()
+          
+          // Play the audio
+          audioElement.play()
+            .then(() => {
+              console.log('Audio playing:', dialogueId)
+              setIsPlaying(true)
+              setCurrentTrack(dialogueId)
+            })
+            .catch(err => {
+              console.error('Error playing audio:', err)
+              // Try the local fallback if there's an error
+              playLocalAudio(dialogueId, dialogue)
+            })
+        }
+        
+        audioElement.onended = () => {
           console.log('Audio ended:', dialogueId)
           setIsPlaying(false)
           setCurrentDialogue(null)
-        },
-        onloaderror: (id, err) => {
-          console.error('Audio load error:', dialogueId, err)
-        },
-        onplayerror: (id, err) => {
-          console.error('Audio play error:', dialogueId, err)
         }
-      })
+        
+        audioElement.onerror = (err) => {
+          console.error('Audio error:', err)
+          // Try the local fallback if there's an error
+          playLocalAudio(dialogueId, dialogue)
+        }
+      } else {
+        // Fallback to Howler if audio element is not available
+        const audio = new Howl({
+          src: [audioUrl],
+          html5: true,
+          preload: true,
+          format: ['mp3'],
+          xhr: {
+            method: 'GET',
+            headers: {
+              'Origin': window.location.origin,
+              'Range': 'bytes=0-',
+            },
+            withCredentials: false
+          },
+          onload: () => {
+            console.log('Audio loaded (Howler):', dialogueId)
+            setCurrentDialogue(dialogue)
+          },
+          onplay: () => {
+            console.log('Audio playing (Howler):', dialogueId)
+            setIsPlaying(true)
+            setCurrentTrack(dialogueId)
+          },
+          onend: () => {
+            console.log('Audio ended (Howler):', dialogueId)
+            setIsPlaying(false)
+            setCurrentDialogue(null)
+          },
+          onloaderror: (id, err) => {
+            console.error('Audio load error (Howler):', dialogueId, err)
+            // Try the local fallback if there's an error
+            playLocalAudio(dialogueId, dialogue)
+          },
+          onplayerror: (id, err) => {
+            console.error('Audio play error (Howler):', dialogueId, err)
+            // Try the local fallback if there's an error
+            playLocalAudio(dialogueId, dialogue)
+          }
+        })
 
-      // Add error handlers to catch CORS issues
-      audio.once('loaderror', (id, err) => {
-        console.error('Audio load error (possibly CORS):', dialogueId, err)
-        // Try the local fallback if there's an error
-        playLocalAudio(dialogueId, dialogue)
-      })
-
-      audio.play()
-      audioRef.current = audio
-
+        audio.play()
+        audioRef.current = audio
+      }
     } catch (err) {
       console.error('Failed to play audio:', err)
       // Try the local fallback if there's an exception
       playLocalAudio(dialogueId, dialogue)
     }
   }, [playLocalAudio])
-
-  // Initialize the audio context when the component mounts
-  useEffect(() => {
-    // Try to initialize immediately
-    let { analyzer: newAnalyzer } = initAudioContext()
-    
-    // If initialization failed, retry after a short delay
-    // This gives Howler time to fully initialize
-    if (!newAnalyzer) {
-      const initTimer = setTimeout(() => {
-        const result = initAudioContext()
-        if (!result.analyzer) {
-          console.warn('Failed to initialize audio analyzer after retry')
-        }
-      }, 500)
-      
-      return () => {
-        clearTimeout(initTimer)
-        // Clean up if needed
-        if (analyzer && Howler.ctx && Howler.masterGain) {
-          try {
-            // Reconnect Howler's masterGain directly to destination
-            Howler.masterGain.disconnect()
-            Howler.masterGain.connect(Howler.ctx.destination)
-            console.log('Cleaned up audio analyzer connections')
-          } catch (err) {
-            console.error('Error cleaning up audio connections:', err)
-          }
-        }
-      }
-    }
-    
-    return () => {
-      // Clean up if needed
-      if (analyzer && Howler.ctx && Howler.masterGain) {
-        try {
-          // Reconnect Howler's masterGain directly to destination
-          Howler.masterGain.disconnect()
-          Howler.masterGain.connect(Howler.ctx.destination)
-          console.log('Cleaned up audio analyzer connections')
-        } catch (err) {
-          console.error('Error cleaning up audio connections:', err)
-        }
-      }
-    }
-  }, [])
   
   // Function to get analyzer data for visualizer
   const getAnalyzerData = useCallback(() => {
     if (!analyzer) return null
     
     try {
-      // Make sure Howler is initialized and connected
-      if (Howler.ctx && Howler.masterGain && isPlaying) {
-        // Ensure analyzer is connected to the audio source
-        if (!analyzer.connected) {
-          try {
-            Howler.masterGain.disconnect()
-            Howler.masterGain.connect(analyzer)
-            analyzer.connect(Howler.ctx.destination)
-            analyzer.connected = true
-            console.log('Reconnected analyzer to audio source')
-          } catch (connErr) {
-            console.error('Error connecting analyzer:', connErr)
-          }
-        }
-      }
-      
       const bufferLength = analyzer.frequencyBinCount
       const dataArray = new Uint8Array(bufferLength)
       analyzer.getByteFrequencyData(dataArray)
