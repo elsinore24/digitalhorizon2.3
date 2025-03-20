@@ -51,8 +51,26 @@ export default function AudioVisualizer() {
       // Get audio data from analyzer
       const audioData = getAnalyzerData()
       
+      // Log the audio data for debugging
+      console.log('Audio data from getAnalyzerData:', audioData)
+      
       // Get audio data from analyzer or use empty array if not available
       const { dataArray, bufferLength } = audioData || { dataArray: new Uint8Array(128).fill(0), bufferLength: 128 }
+      
+      // Log the first few values of dataArray
+      if (dataArray) {
+        console.log('First 5 values of dataArray:', Array.from(dataArray.slice(0, 5)))
+        
+        // Check if there's any non-zero data
+        let hasNonZeroData = false
+        for (let i = 0; i < dataArray.length; i++) {
+          if (dataArray[i] > 0) {
+            hasNonZeroData = true
+            break
+          }
+        }
+        console.log('Has non-zero data:', hasNonZeroData)
+      }
       
       // Draw the bars
       for (let i = 0; i < barCount; i++) {
