@@ -65,15 +65,16 @@ export default function AudioVisualizer() {
         // Map bars to frequency data with center bars getting lower frequencies
         let dataIndex
         
-        if (distanceFromCenter < 8) {
-          // Center 16 bars - map to the most active lower frequencies (bass/mid)
-          // These are usually in the first third of the frequency data
-          dataIndex = Math.floor((distanceFromCenter / 8) * (bufferLength / 3))
-        } else {
-          // Outer bars - map to higher frequencies
-          const outerPosition = (distanceFromCenter - 8) / (centerIndex - 8)
-          dataIndex = Math.floor((bufferLength / 3) + outerPosition * (bufferLength * 2 / 3))
-        }
+        // Improved mapping to avoid duplicates and large outer bars
+        // Use a more gradual mapping across the entire frequency range
+        const normalizedPosition = i / barCount // 0 to 1 across all bars
+        
+        // Apply a curve to emphasize mid-range frequencies
+        // This creates a more natural distribution and avoids the large outer bars
+        const curvedPosition = Math.pow(normalizedPosition, 1.2)
+        
+        // Map to the frequency data
+        dataIndex = Math.floor(curvedPosition * (bufferLength - 1))
         
         // Ensure dataIndex is within bounds
         const safeIndex = Math.min(Math.max(0, dataIndex), bufferLength - 1)
