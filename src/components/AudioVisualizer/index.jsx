@@ -42,7 +42,12 @@ export default function AudioVisualizer() {
       
       // Calculate the starting X position to center the visualizer
       const totalWidth = barCount * totalBarWidth
-      const startX = (WIDTH - totalWidth) / 2
+      const startX = Math.floor((WIDTH - totalWidth) / 2)
+      
+      // Debug centering
+      if (isPlaying) {
+        console.log(`Canvas width: ${WIDTH}, Total bars width: ${totalWidth}, Start X: ${startX}`)
+      }
       
       // Draw the bars
       for (let i = 0; i < barCount; i++) {
@@ -54,16 +59,27 @@ export default function AudioVisualizer() {
         const value = dataArray[dataIndex]
         
         // Calculate position factor - 0 at edges, 1 at center
-        const position = i / barCount
-        const positionFactor = 1 - 2 * Math.abs(position - 0.5)
+        const position = i / (barCount - 1)  // Ranges from 0 to 1 exactly
+        
+        // Calculate distance from center bar (which should be at barCount/2)
+        // This ensures perfect symmetry around the center
+        const centerBarIndex = Math.floor(barCount / 2)
+        const distanceFromCenter = Math.abs(i - centerBarIndex) / centerBarIndex
+        const positionFactor = 1 - distanceFromCenter
         
         // Apply power function to create steeper dome effect
-        const enhancedPositionFactor = Math.pow(positionFactor, 2)
+        const enhancedPositionFactor = Math.pow(positionFactor, 3) // Cubic for even steeper dome
         
         // Scale the height based on the frequency value and position
-        // Make center bars much taller by applying a stronger position factor
-        const heightMultiplier = 0.3 + (enhancedPositionFactor * 3.5) // 0.3 at edges, 3.8 at center
-        const height = (value / 255) * HEIGHT * 0.8 * heightMultiplier
+        const heightMultiplier = 0.2 + (enhancedPositionFactor * 4.0) // 0.2 at edges, 4.2 at center
+        
+        // Force the dome shape to be more prominent than the frequency data
+        // This ensures the dome shape is always visible regardless of frequency content
+        const baseHeight = HEIGHT * 0.15 * enhancedPositionFactor // Base dome shape
+        const frequencyHeight = (value / 255) * HEIGHT * 0.65 * heightMultiplier // Frequency-based height
+        
+        // Combine base dome shape with frequency data
+        const height = baseHeight + frequencyHeight
         
         // Set fill style with gradient
         ctx.fillStyle = gradient
