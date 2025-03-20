@@ -28,9 +28,12 @@ export default function AudioVisualizer() {
       // Update time reference
       timeRef.current += 0.01
       
-      // Clear with fade effect
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
+      // Clear with fade effect (transparent)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0)'
       ctx.fillRect(0, 0, WIDTH, HEIGHT)
+      
+      // Clear the canvas completely
+      ctx.clearRect(0, 0, WIDTH, HEIGHT)
       
       // Draw subtle background glow
       const bgGradient = ctx.createRadialGradient(
@@ -295,8 +298,8 @@ export default function AudioVisualizer() {
     <canvas 
       ref={canvasRef} 
       className={styles.visualizer}
-      width="150"
-      height="30"
+      width="600"
+      height="120"
     />
   )
 }

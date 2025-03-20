@@ -40,13 +40,13 @@ export default function DialogueBox({ dialogue, onComplete }) {
 
   return (
     <div className={styles.dialogueBox}>
+      {isPlaying && (
+        <div className={styles.visualizerContainer}>
+          <AudioVisualizer />
+        </div>
+      )}
       <div className={styles.header}>
         <div className={styles.speaker}>{dialogue.speaker}</div>
-        {isPlaying && (
-          <div className={styles.visualizerContainer}>
-            <AudioVisualizer />
-          </div>
-        )}
       </div>
       <div className={styles.text}>
         {displayText}
