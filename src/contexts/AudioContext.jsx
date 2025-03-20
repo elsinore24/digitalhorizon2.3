@@ -265,10 +265,10 @@ export function AudioProvider({ children }) {
               console.log('Tone.js player loaded successfully')
               setCurrentDialogue(dialogue)
               
-              // Create an analyzer with larger FFT size for better resolution
+              // Create an analyzer with the same FFT size as the desktop version
               const toneAnalyzer = new Tone.Analyser({
                 type: 'fft',
-                size: 1024,
+                size: 256, // Match desktop analyzer size
                 smoothing: 0.8
               })
               
