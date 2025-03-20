@@ -528,15 +528,40 @@ export function AudioProvider({ children }) {
         console.log('[iOS Tone.js Analyzer] Max analyzer value:', maxValue.toFixed(2), 'Has sound:', hasSound)
         
         if (hasSound) {
+          // Implement a noise gate to filter out low-level signals
+          // Find the noise floor - the average of the lowest 20% of values
+          const sortedValues = [...values].sort((a, b) => a - b);
+          const noiseFloorSampleCount = Math.floor(bufferLength * 0.2); // Use lowest 20% of values
+          let noiseFloorSum = 0;
+          
+          for (let i = 0; i < noiseFloorSampleCount; i++) {
+            noiseFloorSum += sortedValues[i];
+          }
+          
+          // Calculate noise floor (average of lowest values)
+          const noiseFloor = noiseFloorSum / noiseFloorSampleCount;
+          
+          // Add a small buffer above the noise floor (6dB)
+          const noiseGateThreshold = noiseFloor + 6;
+          
+          console.log('[iOS Tone.js Analyzer] Noise floor:', noiseFloor.toFixed(2), 'dB');
+          console.log('[iOS Tone.js Analyzer] Noise gate threshold:', noiseGateThreshold.toFixed(2), 'dB');
+          
           for (let i = 0; i < bufferLength; i++) {
+            // Apply noise gate - if value is below threshold, set to minimum (-100dB)
+            const gatedValue = values[i] > noiseGateThreshold ? values[i] : -100;
+            
             // Convert from dB (-100 to 0) to 0-255 range
             // -100dB maps to 0, 0dB maps to 255
-            const normalized = (values[i] + 100) / 100 // Now 0 to 1
-            dataArray[i] = Math.floor(normalized * 255)
+            const normalized = (gatedValue + 100) / 100; // Now 0 to 1
+            dataArray[i] = Math.floor(normalized * 255);
           }
+          
+          // Log the effect of the noise gate
+          console.log('[iOS Tone.js Analyzer] After noise gate (first 5):', Array.from(dataArray.slice(0, 5)));
         } else {
           // If there's no sound, set all values to 0
-          dataArray.fill(0)
+          dataArray.fill(0);
         }
         
         // Log the converted values for debugging
