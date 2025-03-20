@@ -274,7 +274,27 @@ export function AudioProvider({ children }) {
               
               // Connect the player to the analyzer and then to the destination
               console.log('[iOS Tone.js] Connecting player to analyzer and destination')
-              player.fan(Tone.Destination, toneAnalyzer)
+              
+              // Make sure we're connecting to the destination properly
+              try {
+                // First disconnect any existing connections to avoid issues
+                player.disconnect();
+                
+                // Connect to both the analyzer and the destination
+                // Using fan() to split the signal to both
+                player.fan(Tone.Destination, toneAnalyzer);
+                
+                // Double-check that we're connected to the destination
+                console.log('[iOS Tone.js] Player connected to destination:', 
+                  player.output.numberOfOutputs > 0 ? 'Yes' : 'No');
+              } catch (err) {
+                console.error('[iOS Tone.js] Error connecting player:', err);
+                
+                // Fallback connection method if the fan method fails
+                console.log('[iOS Tone.js] Using fallback connection method');
+                player.connect(Tone.Destination);
+                player.connect(toneAnalyzer);
+              }
               
               // Store the analyzer in our global analyzer variable
               analyzer = toneAnalyzer
@@ -529,9 +549,9 @@ export function AudioProvider({ children }) {
         
         if (hasSound) {
           // Implement a fixed noise gate threshold for background noise
-          // Based on observed values, background noise is typically around -60 to -70 dB
-          // Set a threshold that's higher than typical background noise
-          const noiseGateThreshold = -55; // Only allow signals stronger than -55dB
+          // Based on observed values, background noise is typically around -80 to -90 dB
+          // Set a threshold that balances filtering noise while preserving real audio
+          const noiseGateThreshold = -70; // Only allow signals stronger than -70dB
           
           console.log('[iOS Tone.js Analyzer] Using fixed noise gate threshold:', noiseGateThreshold, 'dB');
           
