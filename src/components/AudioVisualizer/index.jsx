@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import useAudio from '../../hooks/useAudio'
 import styles from './AudioVisualizer.module.scss'
 
 export default function AudioVisualizer() {
   const canvasRef = useRef(null)
   const animationRef = useRef(null)
-  const { isPlaying } = useAudio()
+  const { isPlaying, getAnalyzerData } = useAudio()
   
   useEffect(() => {
     if (!canvasRef.current) return
@@ -30,9 +30,15 @@ export default function AudioVisualizer() {
       gradient.addColorStop(0.3, 'rgba(255, 105, 180, 0.95)') // Pink in middle
       gradient.addColorStop(1, 'rgba(150, 0, 205, 0.95)') // Purple at bottom
       
-      // Number of bars - reduced for half width
-      const barCount = 100 // Half of the previous 200
-      const barWidth = 1
+      // Get audio data from analyzer
+      const audioData = getAnalyzerData()
+      
+      // Get audio data from analyzer or use empty array if not available
+      const { dataArray, bufferLength } = audioData || { dataArray: new Uint8Array(128).fill(0), bufferLength: 128 }
+      
+      // Number of bars
+      const barCount = Math.min(bufferLength, 128) // Limit to 128 bars max
+      const barWidth = 2
       const barSpacing = Math.max(1, Math.floor((WIDTH - barCount * barWidth) / barCount))
       const totalBarWidth = barWidth + barSpacing
       
@@ -44,26 +50,11 @@ export default function AudioVisualizer() {
       for (let i = 0; i < barCount; i++) {
         const x = startX + i * totalBarWidth
         
-        // Calculate height based on position and time
-        const time = Date.now() / 1000
+        // Get the frequency value (0-255)
+        const value = dataArray[i]
         
-        // Create a wave-like pattern with multiple frequencies
-        const freq1 = 0.1 // Base frequency
-        const freq2 = 0.2 // Second frequency
-        const freq3 = 0.05 // Slow modulation
-        
-        // Combine multiple sine waves for a more complex pattern
-        const wave1 = Math.sin(i * freq1 + time * 2)
-        const wave2 = 0.5 * Math.sin(i * freq2 + time * 3)
-        const wave3 = 0.3 * Math.sin(i * freq3 + time * 1)
-        
-        // Combine waves and scale to create variation
-        const variation = Math.abs(wave1 + wave2 + wave3) / 1.8
-        
-        // Calculate height - taller in the middle, shorter at edges
-        const position = i / barCount
-        const positionFactor = 1 - 2 * Math.abs(position - 0.5)
-        const height = HEIGHT * 0.6 * variation * (0.5 + positionFactor * 0.5)
+        // Scale the height based on the frequency value
+        const height = (value / 255) * HEIGHT * 0.9
         
         // Set fill style with gradient
         ctx.fillStyle = gradient
@@ -72,7 +63,7 @@ export default function AudioVisualizer() {
         ctx.shadowColor = 'rgba(255, 100, 150, 0.8)'
         ctx.shadowBlur = 5
         
-        // Draw the bar from bottom up (no mirroring)
+        // Draw the bar from bottom up
         ctx.fillRect(x, HEIGHT - height, barWidth, height)
         
         // Reset shadow for next bar
@@ -83,10 +74,8 @@ export default function AudioVisualizer() {
       animationRef.current = requestAnimationFrame(draw)
     }
     
-    // Start animation if playing
-    if (isPlaying) {
-      draw()
-    }
+    // Start animation if playing or always run for demo purposes
+    draw()
     
     // Cleanup
     return () => {
@@ -94,14 +83,14 @@ export default function AudioVisualizer() {
         cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [isPlaying])
+  }, [isPlaying, getAnalyzerData])
   
   useEffect(() => {
-    // Function to resize canvas to match window width
+    // Function to resize canvas to half window width
     const resizeCanvas = () => {
       if (!canvasRef.current) return
       const canvas = canvasRef.current
-      canvas.width = window.innerWidth
+      canvas.width = Math.floor(window.innerWidth / 2) // Half of window width
       canvas.height = 200
     }
     

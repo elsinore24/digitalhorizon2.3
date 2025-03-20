@@ -270,42 +270,21 @@ export function AudioProvider({ children }) {
       const dataArray = new Uint8Array(bufferLength)
       analyzer.getByteFrequencyData(dataArray)
       
-      // Generate synthetic data if no real data is available
+      // Check if we have real audio data
       let sum = 0
       for (let i = 0; i < bufferLength; i++) {
         sum += dataArray[i]
       }
       
+      // If no real data is available but audio is playing, create minimal data
+      // This avoids using wave functions but still shows some activity
       if (sum === 0 && isPlaying) {
         console.log('No audio data detected despite audio playing')
         
-        // Create synthetic data based on time for visualization
-        const time = Date.now() / 1000
+        // Create minimal random data for visualization
         for (let i = 0; i < bufferLength; i++) {
-          // Base amplitude decreases as frequency (i) increases
-          const baseAmplitude = 200 - (i / bufferLength) * 100
-          
-          // Different oscillation speeds for different frequency bands
-          const oscillationSpeed = 1.5 + (i / bufferLength) * 3
-          
-          // Phase shift based on position to create wave-like motion
-          const phaseShift = i * 0.7
-          
-          // Add some randomness for more natural look
-          const noise = 10 * Math.sin(time * 10 + i * 20)
-          
-          // Combine multiple oscillations with different frequencies
-          let value = baseAmplitude * (
-            0.6 * Math.sin(time * oscillationSpeed + phaseShift) +
-            0.3 * Math.sin(time * oscillationSpeed * 1.7 + phaseShift * 1.3) +
-            0.1 * Math.sin(time * oscillationSpeed * 3.1 + phaseShift * 0.5)
-          ) + noise
-          
-          // Ensure value is positive and within range
-          value = Math.abs(value)
-          value = Math.min(255, Math.max(0, value))
-          
-          dataArray[i] = value
+          // Random values between 5 and 30 (very low but visible)
+          dataArray[i] = Math.floor(Math.random() * 25) + 5
         }
       }
       
