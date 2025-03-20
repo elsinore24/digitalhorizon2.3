@@ -265,12 +265,8 @@ export function AudioProvider({ children }) {
               console.log('Tone.js player loaded successfully')
               setCurrentDialogue(dialogue)
               
-              // Create an analyzer with the same FFT size as the desktop version
-              const toneAnalyzer = new Tone.Analyser({
-                type: 'fft',
-                size: 256, // Match desktop analyzer size
-                smoothing: 0.8
-              })
+              // Create an analyzer with default settings
+              const toneAnalyzer = new Tone.Analyser('fft', 256)
               
               // Connect the player to the analyzer and then to the destination
               player.fan(Tone.Destination, toneAnalyzer)
