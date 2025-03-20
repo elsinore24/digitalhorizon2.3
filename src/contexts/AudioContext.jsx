@@ -528,24 +528,12 @@ export function AudioProvider({ children }) {
         console.log('[iOS Tone.js Analyzer] Max analyzer value:', maxValue.toFixed(2), 'Has sound:', hasSound)
         
         if (hasSound) {
-          // Implement a noise gate to filter out low-level signals
-          // Find the noise floor - the average of the lowest 20% of values
-          const sortedValues = [...values].sort((a, b) => a - b);
-          const noiseFloorSampleCount = Math.floor(bufferLength * 0.2); // Use lowest 20% of values
-          let noiseFloorSum = 0;
+          // Implement a fixed noise gate threshold for background noise
+          // Based on observed values, background noise is typically around -80 to -90 dB
+          // Set a threshold that's higher than typical background noise
+          const noiseGateThreshold = -75; // Only allow signals stronger than -75dB
           
-          for (let i = 0; i < noiseFloorSampleCount; i++) {
-            noiseFloorSum += sortedValues[i];
-          }
-          
-          // Calculate noise floor (average of lowest values)
-          const noiseFloor = noiseFloorSum / noiseFloorSampleCount;
-          
-          // Add a small buffer above the noise floor (6dB)
-          const noiseGateThreshold = noiseFloor + 6;
-          
-          console.log('[iOS Tone.js Analyzer] Noise floor:', noiseFloor.toFixed(2), 'dB');
-          console.log('[iOS Tone.js Analyzer] Noise gate threshold:', noiseGateThreshold.toFixed(2), 'dB');
+          console.log('[iOS Tone.js Analyzer] Using fixed noise gate threshold:', noiseGateThreshold, 'dB');
           
           for (let i = 0; i < bufferLength; i++) {
             // Apply noise gate - if value is below threshold, set to minimum (-100dB)
