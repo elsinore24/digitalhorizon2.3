@@ -36,8 +36,8 @@ export default function AudioVisualizer() {
       // Get audio data from analyzer or use empty array if not available
       const { dataArray, bufferLength } = audioData || { dataArray: new Uint8Array(128).fill(0), bufferLength: 128 }
       
-      // Number of bars
-      const barCount = Math.min(bufferLength, 128) // Limit to 128 bars max
+      // Number of bars - use fewer bars to avoid duplicates
+      const barCount = 64 // Reduced from 128 to avoid duplicates
       const barWidth = 2
       const barSpacing = Math.max(1, Math.floor((WIDTH - barCount * barWidth) / barCount))
       const totalBarWidth = barWidth + barSpacing
@@ -51,10 +51,18 @@ export default function AudioVisualizer() {
         const x = startX + i * totalBarWidth
         
         // Get the frequency value (0-255)
-        const value = dataArray[i]
+        // Use a subset of the frequency data to avoid duplicates
+        const dataIndex = Math.floor(i * (bufferLength / barCount))
+        const value = dataArray[dataIndex]
         
-        // Scale the height based on the frequency value
-        const height = (value / 255) * HEIGHT * 0.9
+        // Calculate position factor - 0 at edges, 1 at center
+        const position = i / barCount
+        const positionFactor = 1 - 2 * Math.abs(position - 0.5)
+        
+        // Scale the height based on the frequency value and position
+        // Make center bars much taller by applying a stronger position factor
+        const heightMultiplier = 0.5 + (positionFactor * 1.5) // 0.5 at edges, 2.0 at center
+        const height = (value / 255) * HEIGHT * 0.8 * heightMultiplier
         
         // Set fill style with gradient
         ctx.fillStyle = gradient

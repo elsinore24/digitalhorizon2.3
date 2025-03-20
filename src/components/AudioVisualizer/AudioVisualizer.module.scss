@@ -2,8 +2,9 @@
   height: 200px;
   background: transparent;
   display: block;
-  margin: 0 auto;
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
+  z-index: 10; /* Ensure it's above other elements */
+  bottom: 100px; /* Position from bottom instead of using margin */
 }
