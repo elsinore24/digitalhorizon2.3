@@ -79,10 +79,11 @@ export default function AudioVisualizer() {
         const positionFactor = Math.max(0, 1 - Math.pow(normalizedDistance, 1.5))
         
         // Scale the height based on the frequency value and position
-        const heightMultiplier = 0.4 + (positionFactor * 2.6) // 0.4 at edges, 3.0 at center
+        // Reduced multiplier range for smaller bars
+        const heightMultiplier = 0.2 + (positionFactor * 1.8) // 0.2 at edges, 2.0 at center
         
-        // Calculate height based on frequency data - use full height
-        const height = (value / 255) * HEIGHT * heightMultiplier
+        // Calculate height based on frequency data with overall scaling factor
+        const height = (value / 255) * HEIGHT * heightMultiplier * 0.6 // Added 0.6 scaling factor to reduce overall height
         
         // Calculate the center line (vertically)
         const centerY = HEIGHT / 2
