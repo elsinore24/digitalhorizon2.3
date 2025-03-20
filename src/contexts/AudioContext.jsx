@@ -249,52 +249,68 @@ export function AudioProvider({ children }) {
         Tone.start()
       }
       
-      // Create a buffer to load the audio
-      const buffer = new Tone.Buffer(url, () => {
-        console.log('Audio buffer loaded (Tone.js):', dialogueId)
-        
+      // Wait for user interaction to ensure Tone.js context is running
+      const startTone = async () => {
         try {
-          // Create a player with the loaded buffer
-          const player = new Tone.Player(buffer).toDestination()
+          // Ensure Tone.js context is running
+          await Tone.start()
+          console.log('Tone.js context started successfully')
           
-          // Create an analyzer
-          const toneAnalyzer = new Tone.Analyser('fft', 256)
-          
-          // Connect the player to the analyzer
-          player.connect(toneAnalyzer)
-          
-          // Store the analyzer in our global analyzer variable
-          analyzer = toneAnalyzer
-          
-          // Set up stop handler
-          player.onstop = () => {
-            console.log('Audio ended (Tone.js):', dialogueId)
-            setIsPlaying(false)
-            setCurrentDialogue(null)
-          }
-          
-          // Start playback
-          player.start()
-          console.log('Audio playing (Tone.js):', dialogueId)
-          setIsPlaying(true)
-          setCurrentTrack(dialogueId)
-          setCurrentDialogue(dialogue)
-          
-          // Store the player
-          audioRef.current = player
+          // Create a player directly with URL
+          const player = new Tone.Player({
+            url: url,
+            autostart: false,
+            loop: false,
+            onload: () => {
+              console.log('Tone.js player loaded successfully')
+              setCurrentDialogue(dialogue)
+              
+              // Create an analyzer with larger FFT size for better resolution
+              const toneAnalyzer = new Tone.Analyser({
+                type: 'fft',
+                size: 1024,
+                smoothing: 0.8
+              })
+              
+              // Connect the player to the analyzer and then to the destination
+              player.fan(Tone.Destination, toneAnalyzer)
+              
+              // Store the analyzer in our global analyzer variable
+              analyzer = toneAnalyzer
+              
+              // Start playback
+              player.start()
+              console.log('Audio playing (Tone.js):', dialogueId)
+              setIsPlaying(true)
+              setCurrentTrack(dialogueId)
+              
+              // Set up stop handler
+              player.onstop = () => {
+                console.log('Audio ended (Tone.js):', dialogueId)
+                setIsPlaying(false)
+                setCurrentDialogue(null)
+              }
+              
+              // Store the player
+              audioRef.current = player
+            },
+            onerror: (err) => {
+              console.error('Tone.js player error:', err)
+              // Fall back to Howler
+              console.log('Falling back to Howler due to Tone.js error')
+              playAudioWithHowler(url, dialogueId, dialogue)
+            }
+          })
         } catch (err) {
-          console.error('Error playing loaded buffer with Tone.js:', err)
+          console.error('Error starting Tone.js:', err)
           // Fall back to Howler
-          console.log('Falling back to Howler due to Tone.js error')
+          console.log('Falling back to Howler due to Tone.js start error')
           playAudioWithHowler(url, dialogueId, dialogue)
         }
-      }, (err) => {
-        // Buffer loading error
-        console.error('Error loading audio buffer with Tone.js:', err)
-        // Fall back to Howler
-        console.log('Falling back to Howler due to Tone.js buffer loading error')
-        playAudioWithHowler(url, dialogueId, dialogue)
-      })
+      }
+      
+      // Start Tone.js
+      startTone()
       
       return true
     } catch (err) {
@@ -424,10 +440,10 @@ export function AudioProvider({ children }) {
       const localUrl = getAudioUrl(`${dialogueId}.mp3`)
       console.log('Using local audio URL to avoid CORS:', localUrl)
 
-      // For iOS, use Howler.js which has better iOS compatibility
+      // For iOS, use Tone.js which has better iOS compatibility and analyzer support
       if (isIOS) {
-        console.log('Using Howler for iOS playback')
-        playAudioWithHowler(localUrl, dialogueId, dialogue)
+        console.log('Using Tone.js for iOS playback')
+        playAudioWithTone(localUrl, dialogueId, dialogue)
       } else {
         // Try to play using the audio element first
         const elementSuccess = playAudioWithElement(localUrl, dialogueId, dialogue)
@@ -452,7 +468,7 @@ export function AudioProvider({ children }) {
       // Check if we're using a Tone.js analyzer (for iOS)
       if (analyzer.getValue && typeof analyzer.getValue === 'function') {
         // This is a Tone.js analyzer
-        console.log('Getting data from Tone.js analyzer')
+        // console.log('Getting data from Tone.js analyzer')
         
         // Get the FFT data from Tone.js analyzer
         const values = analyzer.getValue()
@@ -475,59 +491,7 @@ export function AudioProvider({ children }) {
         analyzer.getByteFrequencyData(dataArray)
       }
       
-      // Check if we have real audio data
-      let sum = 0
-      for (let i = 0; i < bufferLength; i++) {
-        sum += dataArray[i]
-      }
-      
-      // If no real data is available but audio is playing, create simulated data
-      if (sum === 0 && isPlaying) {
-        console.log('No audio data detected despite audio playing')
-        
-        // For iOS, create more realistic audio visualization data
-        if (isIOS) {
-          // Use a combination of sine waves to create a more realistic audio pattern
-          // This simulates frequency data that responds to time, creating a more
-          // natural-looking visualization without being too random or too uniform
-          
-          const time = Date.now() / 1000; // Current time in seconds for animation
-          
-          // Create a base pattern that changes over time
-          for (let i = 0; i < bufferLength; i++) {
-            // Normalized position in the array (0 to 1)
-            const normalizedIndex = i / bufferLength;
-            
-            // Create a frequency distribution that's higher in the bass/mid range (left side)
-            // and lower in the high range (right side) - typical for most audio
-            const frequencyFactor = Math.max(0, 1 - normalizedIndex * 1.5);
-            
-            // Add time-based variation
-            const timeVariation = Math.sin(time * 2 + normalizedIndex * 5) * 0.5 + 0.5;
-            
-            // Add some randomness to make it look more natural
-            const randomness = Math.random() * 0.3;
-            
-            // Combine factors and scale to appropriate range
-            dataArray[i] = Math.floor((frequencyFactor * 0.7 + timeVariation * 0.2 + randomness * 0.1) * 70);
-          }
-          
-          // Add some peaks to simulate beats
-          const beatIntensity = (Math.sin(time * 1.5) * 0.5 + 0.5) * 40;
-          for (let i = 0; i < 10; i++) {
-            // Add peaks in the bass/mid range
-            const peakIndex = Math.floor(Math.random() * bufferLength * 0.5);
-            dataArray[peakIndex] = Math.min(255, dataArray[peakIndex] + beatIntensity);
-          }
-        } else {
-          // For non-iOS, use the original random data approach
-          for (let i = 0; i < bufferLength; i++) {
-            // Random values between 5 and 30 (very low but visible)
-            dataArray[i] = Math.floor(Math.random() * 25) + 5;
-          }
-        }
-      }
-      
+      // Return the real audio data without any simulation
       return {
         dataArray,
         bufferLength
