@@ -54,37 +54,25 @@ export default function AudioVisualizer() {
         const x = startX + i * totalBarWidth
         
         // Get the frequency value (0-255)
-        // Use a subset of the frequency data to avoid duplicates
-        // Mirror the frequency data for the right half to ensure symmetry
-        let dataIndex
-        if (i < barCount / 2) {
-          // Left half - use actual frequency data
-          dataIndex = Math.floor(i * (bufferLength / (barCount / 2)))
-        } else {
-          // Right half - mirror the left half for symmetry
-          const mirrorIndex = barCount - i - 1
-          dataIndex = Math.floor(mirrorIndex * (bufferLength / (barCount / 2)))
-        }
+        // Use a subset of the frequency data
+        const dataIndex = Math.floor(i * (bufferLength / barCount))
         
         // Ensure dataIndex is within bounds
-        dataIndex = Math.min(dataIndex, bufferLength - 1)
+        const safeIndex = Math.min(dataIndex, bufferLength - 1)
         
         // Get the frequency value without artificial minimums
-        const value = dataArray[dataIndex]
+        const value = dataArray[safeIndex]
         
         // Calculate position factor - 0 at edges, 1 at center
-        const centerBarIndex = Math.floor(barCount / 2)
-        const distanceFromCenter = Math.abs(i - centerBarIndex) / centerBarIndex
-        const positionFactor = 1 - distanceFromCenter
-        
-        // Apply power function to create dome effect
-        const enhancedPositionFactor = Math.pow(positionFactor, 2) // Quadratic for natural dome
+        // Use a simple parabolic function for the dome shape
+        const normalizedPosition = i / (barCount - 1) // 0 to 1
+        const positionFactor = 1 - 4 * Math.pow(normalizedPosition - 0.5, 2) // Parabola: 1 at center, 0 at edges
         
         // Scale the height based on the frequency value and position
-        const heightMultiplier = 0.3 + (enhancedPositionFactor * 2.7) // 0.3 at edges, 3.0 at center
+        // Make center bars taller by multiplying by the position factor
+        const heightMultiplier = 0.5 + (positionFactor * 2.5) // 0.5 at edges, 3.0 at center
         
         // Calculate height based only on frequency data
-        // No base height to ensure bars reduce to zero when no audio is present
         const height = (value / 255) * HEIGHT * 0.8 * heightMultiplier
         
         // Set fill style with gradient
