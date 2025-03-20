@@ -11,11 +11,16 @@ let analyzer = null
 let mediaStreamSource = null
 let audioElement = null
 let audioStream = null
+let isIOS = false
 
 // Initialize Web Audio API context with direct audio capture
 const initAudioContext = () => {
   if (!analyzer) {
     try {
+      // Check if we're on iOS
+      isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+      console.log('iOS device detected:', isIOS)
+      
       // Create our own audio context
       audioContext = new (window.AudioContext || window.webkitAudioContext)()
       
@@ -52,14 +57,26 @@ const connectAnalyzerToAudio = () => {
       }
       
       // Create a new source from the audio element
-      mediaStreamSource = audioContext.createMediaElementSource(audioElement)
-      
-      // Connect the source to the analyzer and then to the destination
-      mediaStreamSource.connect(analyzer)
-      analyzer.connect(audioContext.destination)
-      
-      console.log('Directly connected analyzer to audio element')
-      return true
+      try {
+        mediaStreamSource = audioContext.createMediaElementSource(audioElement)
+        
+        // Connect the source to the analyzer and then to the destination
+        mediaStreamSource.connect(analyzer)
+        analyzer.connect(audioContext.destination)
+        
+        console.log('Directly connected analyzer to audio element')
+        return true
+      } catch (err) {
+        console.error('Error creating media element source:', err)
+        
+        // On iOS, we might not be able to connect the analyzer
+        // In this case, we'll just use the audio element directly
+        if (isIOS) {
+          console.log('iOS detected, using audio element without analyzer')
+          return true
+        }
+        return false
+      }
     }
     
     return false
@@ -81,6 +98,7 @@ export function AudioProvider({ children }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTrack, setCurrentTrack] = useState(null)
   const [currentDialogue, setCurrentDialogue] = useState(null)
+  const [audioInitialized, setAudioInitialized] = useState(false)
   const audioRef = useRef(null)
 
   const getAudioInstance = useCallback(() => {
@@ -94,23 +112,56 @@ export function AudioProvider({ children }) {
     
     // Set up audio element for capturing
     if (typeof window !== 'undefined') {
+      // Check if we're on iOS
+      isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+      console.log('iOS device detected:', isIOS)
+      
       // Create a hidden audio element for capturing
       audioElement = document.createElement('audio')
       audioElement.id = 'audio-visualizer-source'
       audioElement.crossOrigin = 'anonymous' // Add this to help with CORS
       audioElement.style.display = 'none'
+      audioElement.preload = 'auto'
+      
+      // For iOS Safari, we need to set these attributes
+      if (isIOS) {
+        audioElement.controls = true
+        audioElement.playsinline = true
+        audioElement.muted = false
+        audioElement.autoplay = false
+      }
+      
       document.body.appendChild(audioElement)
       
       // Resume audio context on user interaction (required by browsers)
       const resumeAudioContext = () => {
-        if (audioContext && audioContext.state === 'suspended') {
-          audioContext.resume()
-        }
+        console.log('User interaction detected, resuming audio context')
         
-        // Remove event listeners after first interaction
-        document.removeEventListener('click', resumeAudioContext)
-        document.removeEventListener('touchstart', resumeAudioContext)
-        document.removeEventListener('keydown', resumeAudioContext)
+        if (audioContext && audioContext.state === 'suspended') {
+          audioContext.resume().then(() => {
+            console.log('AudioContext resumed successfully')
+            
+            // For iOS, we need to unlock audio capabilities
+            if (isIOS && !audioInitialized) {
+              console.log('Initializing audio on iOS')
+              
+              // Play a short silent sound to unlock audio
+              const unlockAudio = () => {
+                const oscillator = audioContext.createOscillator()
+                oscillator.frequency.value = 1
+                oscillator.connect(audioContext.destination)
+                oscillator.start(0)
+                oscillator.stop(0.001)
+                setAudioInitialized(true)
+                console.log('iOS audio initialized')
+              }
+              
+              unlockAudio()
+            }
+          }).catch(err => {
+            console.error('Failed to resume AudioContext:', err)
+          })
+        }
       }
       
       document.addEventListener('click', resumeAudioContext)
@@ -189,9 +240,10 @@ export function AudioProvider({ children }) {
   // Play audio using Howler as fallback
   const playAudioWithHowler = useCallback((url, dialogueId, dialogue) => {
     try {
-      const audio = new Howl({
+      // Special configuration for iOS
+      const howlerOptions = {
         src: [url],
-        html5: true,
+        html5: true, // Force HTML5 Audio for better iOS compatibility
         preload: true,
         format: ['mp3'],
         onload: () => {
@@ -213,9 +265,27 @@ export function AudioProvider({ children }) {
         },
         onplayerror: (id, err) => {
           console.error('Audio play error (Howler):', dialogueId, err)
+          
+          // On iOS, try to recover from play errors
+          if (isIOS) {
+            console.log('Attempting to recover from iOS play error')
+            
+            // Force unlock audio context
+            if (audioContext && audioContext.state === 'suspended') {
+              audioContext.resume().then(() => {
+                console.log('Retrying audio playback after resume')
+                
+                // Try playing again
+                const audio = new Howl(howlerOptions)
+                audio.play()
+                audioRef.current = audio
+              })
+            }
+          }
         }
-      })
+      }
 
+      const audio = new Howl(howlerOptions)
       audio.play()
       audioRef.current = audio
       return true
@@ -249,12 +319,18 @@ export function AudioProvider({ children }) {
       const localUrl = getAudioUrl(`${dialogueId}.mp3`)
       console.log('Using local audio URL to avoid CORS:', localUrl)
 
-      // Try to play using the audio element first
-      const elementSuccess = playAudioWithElement(localUrl, dialogueId, dialogue)
-      
-      // If audio element fails, fall back to Howler
-      if (!elementSuccess) {
+      // For iOS, prefer Howler.js as it has better iOS compatibility
+      if (isIOS) {
+        console.log('Using Howler for iOS playback')
         playAudioWithHowler(localUrl, dialogueId, dialogue)
+      } else {
+        // Try to play using the audio element first
+        const elementSuccess = playAudioWithElement(localUrl, dialogueId, dialogue)
+        
+        // If audio element fails, fall back to Howler
+        if (!elementSuccess) {
+          playAudioWithHowler(localUrl, dialogueId, dialogue)
+        }
       }
     } catch (err) {
       console.error('Failed to play audio:', err)
