@@ -400,15 +400,50 @@ export function AudioProvider({ children }) {
         sum += dataArray[i]
       }
       
-      // If no real data is available but audio is playing, create minimal data
-      // This avoids using wave functions but still shows some activity
+      // If no real data is available but audio is playing, create simulated data
       if (sum === 0 && isPlaying) {
         console.log('No audio data detected despite audio playing')
         
-        // Create minimal random data for visualization
-        for (let i = 0; i < bufferLength; i++) {
-          // Random values between 5 and 30 (very low but visible)
-          dataArray[i] = Math.floor(Math.random() * 25) + 5
+        // For iOS, create more realistic audio visualization data
+        if (isIOS) {
+          // Use a combination of sine waves to create a more realistic audio pattern
+          // This simulates frequency data that responds to time, creating a more
+          // natural-looking visualization without being too random or too uniform
+          
+          const time = Date.now() / 1000; // Current time in seconds for animation
+          
+          // Create a base pattern that changes over time
+          for (let i = 0; i < bufferLength; i++) {
+            // Normalized position in the array (0 to 1)
+            const normalizedIndex = i / bufferLength;
+            
+            // Create a frequency distribution that's higher in the bass/mid range (left side)
+            // and lower in the high range (right side) - typical for most audio
+            const frequencyFactor = Math.max(0, 1 - normalizedIndex * 1.5);
+            
+            // Add time-based variation
+            const timeVariation = Math.sin(time * 2 + normalizedIndex * 5) * 0.5 + 0.5;
+            
+            // Add some randomness to make it look more natural
+            const randomness = Math.random() * 0.3;
+            
+            // Combine factors and scale to appropriate range
+            dataArray[i] = Math.floor((frequencyFactor * 0.7 + timeVariation * 0.2 + randomness * 0.1) * 70);
+          }
+          
+          // Add some peaks to simulate beats
+          const beatIntensity = (Math.sin(time * 1.5) * 0.5 + 0.5) * 40;
+          for (let i = 0; i < 10; i++) {
+            // Add peaks in the bass/mid range
+            const peakIndex = Math.floor(Math.random() * bufferLength * 0.5);
+            dataArray[peakIndex] = Math.min(255, dataArray[peakIndex] + beatIntensity);
+          }
+        } else {
+          // For non-iOS, use the original random data approach
+          for (let i = 0; i < bufferLength; i++) {
+            // Random values between 5 and 30 (very low but visible)
+            dataArray[i] = Math.floor(Math.random() * 25) + 5;
+          }
         }
       }
       
