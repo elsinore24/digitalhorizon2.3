@@ -1,9 +1,38 @@
-import { createContext, useState, useRef, useCallback } from 'react'
-import { Howl } from 'howler'
+import { createContext, useState, useRef, useCallback, useEffect } from 'react'
+import { Howl, Howler } from 'howler'
 import dialogueData from '../data/dialogue.json'
 import { supabase } from '../config/supabase'
 
 export const AudioContext = createContext(null)
+
+// Create Web Audio API context and analyzer
+let analyzer = null
+
+// Initialize Web Audio API context and connect to Howler
+const initAudioContext = () => {
+  if (!analyzer && window.Howler) {
+    // Get Howler's audio context
+    const audioCtx = Howler.ctx
+    
+    // Create analyzer node
+    analyzer = audioCtx.createAnalyser()
+    analyzer.fftSize = 256
+    analyzer.smoothingTimeConstant = 0.8
+    
+    // Connect Howler's masterGain to our analyzer
+    if (Howler.masterGain) {
+      // Connect analyzer between masterGain and destination
+      Howler.masterGain.disconnect()
+      Howler.masterGain.connect(analyzer)
+      analyzer.connect(audioCtx.destination)
+      
+      console.log('Successfully connected analyzer to Howler audio context')
+    } else {
+      console.error('Could not access Howler.masterGain')
+    }
+  }
+  return { analyzer }
+}
 
 const AUDIO_BUCKET = 'narration-audio'
 
@@ -134,13 +163,48 @@ export function AudioProvider({ children }) {
     }
   }, [playLocalAudio])
 
+  // Initialize the audio context when the component mounts
+  useEffect(() => {
+    const { analyzer: newAnalyzer } = initAudioContext()
+    
+    return () => {
+      // Clean up if needed
+      if (analyzer && Howler.ctx && Howler.masterGain) {
+        try {
+          // Reconnect Howler's masterGain directly to destination
+          Howler.masterGain.disconnect()
+          Howler.masterGain.connect(Howler.ctx.destination)
+          console.log('Cleaned up audio analyzer connections')
+        } catch (err) {
+          console.error('Error cleaning up audio connections:', err)
+        }
+      }
+    }
+  }, [])
+  
+  // Function to get analyzer data for visualizer
+  const getAnalyzerData = useCallback(() => {
+    if (!analyzer) return null
+    
+    const bufferLength = analyzer.frequencyBinCount
+    const dataArray = new Uint8Array(bufferLength)
+    analyzer.getByteFrequencyData(dataArray)
+    
+    return {
+      dataArray,
+      bufferLength
+    }
+  }, [])
+
   return (
     <AudioContext.Provider value={{
       playNarration,
       getAudioInstance,
       isPlaying,
       currentTrack,
-      currentDialogue
+      currentDialogue,
+      getAnalyzerData, // Expose the analyzer data
+      analyzer // Expose the analyzer directly if needed
     }}>
       {children}
     </AudioContext.Provider>
