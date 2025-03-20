@@ -352,45 +352,15 @@ export function AudioProvider({ children }) {
         sum += dataArray[i]
       }
       
-      // If no real data is available but audio is playing, create simulated data
+      // If no real data is available but audio is playing, create minimal data
+      // This avoids using wave functions but still shows some activity
       if (sum === 0 && isPlaying) {
         console.log('No audio data detected despite audio playing')
         
-        // Special handling for iOS devices - create more controlled visualization data
-        if (isIOS) {
-          console.log('Using iOS-optimized visualization data')
-          
-          // Create a sine wave pattern with lower amplitude for iOS
-          // This creates a more controlled, less erratic visualization
-          const time = Date.now() / 1000
-          const frequency = 2 // Lower frequency for slower movement
-          
-          for (let i = 0; i < bufferLength; i++) {
-            // Calculate normalized position (0 to 1) within the array
-            const normalizedPosition = i / bufferLength
-            
-            // Create a bell curve distribution (higher in middle, lower at edges)
-            const bellCurve = Math.exp(-Math.pow((normalizedPosition - 0.5) * 3, 2))
-            
-            // Add sine wave variation over time
-            const sineWave = Math.sin(time * frequency + normalizedPosition * Math.PI * 4)
-            
-            // Combine bell curve with sine wave and scale to appropriate range (0-20)
-            // Using a much lower range for iOS to make visualization less intense
-            dataArray[i] = Math.floor(bellCurve * 15 * (0.5 + sineWave * 0.3))
-          }
-        } else {
-          // For non-iOS devices, use slightly randomized data
-          for (let i = 0; i < bufferLength; i++) {
-            // Random values between 5 and 30 (very low but visible)
-            dataArray[i] = Math.floor(Math.random() * 25) + 5
-          }
-        }
-      } else if (isIOS) {
-        // For iOS with real data, scale down the values to make visualization less intense
+        // Create minimal random data for visualization
         for (let i = 0; i < bufferLength; i++) {
-          // Scale down to 60% of original value for iOS
-          dataArray[i] = Math.floor(dataArray[i] * 0.6)
+          // Random values between 5 and 30 (very low but visible)
+          dataArray[i] = Math.floor(Math.random() * 25) + 5
         }
       }
       

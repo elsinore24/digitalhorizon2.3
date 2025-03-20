@@ -127,22 +127,12 @@ export default function AudioVisualizer() {
   }, [isPlaying, getAnalyzerData])
   
   useEffect(() => {
-    // Function to resize canvas responsively
+    // Function to resize canvas to half window width
     const resizeCanvas = () => {
       if (!canvasRef.current) return
       const canvas = canvasRef.current
-      
-      // Check if we're on a mobile device
-      const isMobile = window.innerWidth < 768
-      
-      // For mobile devices, use a narrower width
-      if (isMobile) {
-        canvas.width = Math.min(300, Math.floor(window.innerWidth * 0.8)) // 80% of window width up to 300px max
-        canvas.height = 200 // Smaller height for mobile
-      } else {
-        canvas.width = Math.floor(window.innerWidth / 2) // Half of window width for desktop
-        canvas.height = 400 // Taller for desktop
-      }
+      canvas.width = Math.floor(window.innerWidth / 2) // Half of window width
+      canvas.height = 400 // Increased to match container height
     }
     
     // Initial resize
