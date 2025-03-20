@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import useAudio from '../../hooks/useAudio'
 import styles from './AudioVisualizer.module.scss'
+import WaveSurferVisualizer from './WaveSurferVisualizer'
 
 export default function AudioVisualizer() {
   const canvasRef = useRef(null)
@@ -13,6 +14,12 @@ export default function AudioVisualizer() {
     setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream)
   }, [])
   
+  // If on iOS, use WaveSurfer.js for better compatibility
+  if (isIOS) {
+    return <WaveSurferVisualizer />
+  }
+  
+  // For non-iOS, use the original canvas-based visualizer
   useEffect(() => {
     if (!canvasRef.current) return
     const canvas = canvasRef.current
@@ -149,7 +156,7 @@ export default function AudioVisualizer() {
         cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [isPlaying, getAnalyzerData, isIOS])
+  }, [isPlaying, getAnalyzerData])
   
   useEffect(() => {
     // Function to resize canvas to half window width
