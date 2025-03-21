@@ -14,7 +14,7 @@ export default function AudioVisualizer() {
     setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream)
   }, [])
   
-  // If on iOS, use WaveSurfer.js for better compatibility
+  // If on iOS, use WaveSurfer for better compatibility
   if (isIOS) {
     return <WaveSurferVisualizer />
   }
