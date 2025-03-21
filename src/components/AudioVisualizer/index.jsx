@@ -1,187 +1,131 @@
-import { useEffect, useRef, useState } from 'react'
-import useAudio from '../../hooks/useAudio'
-import styles from './AudioVisualizer.module.scss'
-import WaveSurferVisualizer from './WaveSurferVisualizer'
+import { useEffect, useRef, useState, useCallback } from 'react';
+import WaveSurfer from 'wavesurfer.js';
+import useAudio from '../../hooks/useAudio';
+import styles from './AudioVisualizer.module.scss';
 
 export default function AudioVisualizer() {
-  const canvasRef = useRef(null)
-  const animationRef = useRef(null)
-  const { isPlaying, getAnalyzerData } = useAudio()
-  const [isIOS, setIsIOS] = useState(false)
+  // Declare ALL hooks at component top level
+  const waveformRef = useRef(null);
+  const wavesurferRef = useRef(null);
+  const { isPlaying, currentTrack } = useAudio();
+  const [wavesurferReady, setWavesurferReady] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
   
   // Check if we're on iOS
   useEffect(() => {
-    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream)
-  }, [])
+    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream);
+  }, []);
   
-  // If on iOS, use WaveSurfer for better compatibility
-  if (isIOS) {
-    return <WaveSurferVisualizer />
-  }
-  
-  // For non-iOS, use the original canvas-based visualizer
+  // Create WaveSurfer instance
   useEffect(() => {
-    if (!canvasRef.current) return
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
+    if (!waveformRef.current) return;
     
-    // Function to draw the audio visualizer
-    const draw = () => {
-      const WIDTH = canvas.width
-      const HEIGHT = canvas.height
+    console.log('Creating WaveSurfer instance');
+    
+    const wavesurfer = WaveSurfer.create({
+      container: waveformRef.current,
+      waveColor: 'rgba(255, 105, 180, 0.8)',
+      progressColor: 'rgba(255, 165, 0, 0.95)',
+      cursorColor: 'transparent',
+      barWidth: 2,
+      barGap: 1,
+      barRadius: 3,
+      height: 400,
+      responsive: true,
+      // CRITICAL FOR iOS
+      backend: isIOS ? 'MediaElement' : 'WebAudio',
+      mediaControls: false
+    });
+    
+    wavesurferRef.current = wavesurfer;
+    
+    wavesurfer.on('ready', () => {
+      console.log('WaveSurfer is ready');
+      setWavesurferReady(true);
       
-      // Clear the canvas
-      ctx.clearRect(0, 0, WIDTH, HEIGHT)
-      
-      // No background fill - let page background show through
-      
-      // Create gradient for the bars - orange/gold at top to pink/purple at bottom
-      const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT)
-      gradient.addColorStop(0, 'rgba(255, 165, 0, 0.95)') // Orange/gold at top
-      gradient.addColorStop(0.3, 'rgba(255, 105, 180, 0.95)') // Pink in middle
-      gradient.addColorStop(1, 'rgba(150, 0, 205, 0.95)') // Purple at bottom
-      
-      // Number of bars
-      const barCount = 64
-      const barWidth = 2
-      const barSpacing = Math.max(1, Math.floor((WIDTH - barCount * barWidth) / barCount))
-      const totalBarWidth = barWidth + barSpacing
-      
-      // Calculate the starting X position to center the visualizer
-      const totalWidth = barCount * totalBarWidth
-      const startX = Math.floor((WIDTH - totalWidth) / 2)
-      
-      // Calculate exact center index
-      const centerIndex = Math.floor(barCount / 2)
-      
-      // Use the analyzer data for all platforms including iOS
-      // Get audio data from analyzer
-      const audioData = getAnalyzerData()
-      
-      // Log the audio data for debugging
-      console.log('Audio data from getAnalyzerData:', audioData)
-      
-      // Get audio data from analyzer or use empty array if not available
-      const { dataArray, bufferLength } = audioData || { dataArray: new Uint8Array(128).fill(0), bufferLength: 128 }
-      
-      // Log the first few values of dataArray
-      if (dataArray) {
-        console.log('First 5 values of dataArray:', Array.from(dataArray.slice(0, 5)))
-        
-        // Check if there's any non-zero data
-        let hasNonZeroData = false
-        for (let i = 0; i < dataArray.length; i++) {
-          if (dataArray[i] > 0) {
-            hasNonZeroData = true
-            break
-          }
-        }
-        console.log('Has non-zero data:', hasNonZeroData)
+      // Auto-play if isPlaying is true (sync with external state)
+      if (isPlaying) {
+        wavesurfer.play();
       }
-      
-      // Draw the bars
-      for (let i = 0; i < barCount; i++) {
-        const x = startX + i * totalBarWidth
-        
-        // Calculate distance from center (0 at center, increases toward edges)
-        const distanceFromCenter = Math.abs(i - centerIndex)
-        
-        // Get frequency data with emphasis on lower frequencies (which are usually more active)
-        // Map bars to frequency data with center bars getting lower frequencies
-        let dataIndex
-        
-        if (distanceFromCenter < 8) {
-          // Center 16 bars - map to the most active lower frequencies (bass/mid)
-          // These are usually in the first third of the frequency data
-          dataIndex = Math.floor((distanceFromCenter / 8) * (bufferLength / 3))
-        } else {
-          // Outer bars - map to higher frequencies
-          const outerPosition = (distanceFromCenter - 8) / (centerIndex - 8)
-          dataIndex = Math.floor((bufferLength / 3) + outerPosition * (bufferLength * 2 / 3))
-        }
-        
-        // Ensure dataIndex is within bounds
-        const safeIndex = Math.min(Math.max(0, dataIndex), bufferLength - 1)
-        
-        // Get the frequency value
-        const value = dataArray[safeIndex]
-        
-        // Calculate position factor for dome shape (1 at center, 0 at edges)
-        const normalizedDistance = distanceFromCenter / centerIndex
-        const positionFactor = Math.max(0, 1 - Math.pow(normalizedDistance, 1.5))
-        
-        // Scale the height based on the frequency value and position
-        // Reduced multiplier range for smaller bars
-        const heightMultiplier = 0.2 + (positionFactor * 1.8) // 0.2 at edges, 2.0 at center
-        
-        // Calculate height based on frequency data with overall scaling factor
-        const height = (value / 255) * HEIGHT * heightMultiplier * 0.6 // Added 0.6 scaling factor to reduce overall height
-        
-        // Calculate the center line (vertically)
-        const centerY = HEIGHT / 2
-        
-        // Calculate the height for both up and down (half of total height)
-        const halfHeight = height / 2
-        
-        // Set fill style with gradient
-        // Create a gradient that goes from center outward in both directions
-        const barGradient = ctx.createLinearGradient(0, centerY - halfHeight, 0, centerY + halfHeight)
-        barGradient.addColorStop(0, 'rgba(255, 165, 0, 0.95)') // Orange/gold at top
-        barGradient.addColorStop(0.5, 'rgba(255, 105, 180, 0.95)') // Pink in middle
-        barGradient.addColorStop(1, 'rgba(150, 0, 205, 0.95)') // Purple at bottom
-        
-        ctx.fillStyle = barGradient
-        
-        // Add glow effect
-        ctx.shadowColor = 'rgba(255, 100, 150, 0.8)'
-        ctx.shadowBlur = 5
-        
-        // Draw the bar extending both up and down from center
-        ctx.fillRect(x, centerY - halfHeight, barWidth, height)
-        
-        // Reset shadow for next bar
-        ctx.shadowBlur = 0
-      }
-      
-      // Request next frame
-      animationRef.current = requestAnimationFrame(draw)
-    }
+    });
     
-    // Start animation if playing or always run for demo purposes
-    draw()
+    wavesurfer.on('error', (err) => {
+      console.error('WaveSurfer error:', err);
+    });
     
-    // Cleanup
+    // Clean up
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
+      if (wavesurferRef.current) {
+        wavesurferRef.current.destroy();
+        wavesurferRef.current = null;
+        setWavesurferReady(false);
       }
-    }
-  }, [isPlaying, getAnalyzerData])
+    };
+  }, [isIOS]); // Only recreate if iOS detection changes
   
+  // Handle user interaction for iOS (required for audio)
   useEffect(() => {
-    // Function to resize canvas to half window width
-    const resizeCanvas = () => {
-      if (!canvasRef.current) return
-      const canvas = canvasRef.current
-      canvas.width = Math.floor(window.innerWidth / 2) // Half of window width
-      canvas.height = 400 // Increased to match container height
+    if (!isIOS) return;
+    
+    const unlockAudio = () => {
+      if (!wavesurferRef.current) return;
+      
+      console.log('User interaction detected, unlocking audio');
+      // Just calling play() and immediately pause() unlocks audio on iOS
+      wavesurferRef.current.play();
+      wavesurferRef.current.pause();
+      
+      // Remove listeners after first interaction
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+    
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+    
+    return () => {
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+  }, [isIOS]);
+  
+  // Load audio when track changes
+  useEffect(() => {
+    if (!wavesurferRef.current || !currentTrack) return;
+    
+    const audioUrl = `/audio/narration/${currentTrack}.mp3`;
+    console.log(`Loading audio: ${audioUrl}`);
+    
+    // IMPORTANT: Use a try-catch for iOS errors
+    try {
+      wavesurferRef.current.load(audioUrl);
+    } catch (err) {
+      console.error('Error loading audio:', err);
     }
+  }, [currentTrack]);
+  
+  // Control playback based on isPlaying state
+  useEffect(() => {
+    if (!wavesurferRef.current || !wavesurferReady) return;
     
-    // Initial resize
-    resizeCanvas()
-    
-    // Add resize event listener
-    window.addEventListener('resize', resizeCanvas)
-    
-    // Cleanup
-    return () => window.removeEventListener('resize', resizeCanvas)
-  }, [])
+    try {
+      if (isPlaying) {
+        console.log('Playing audio with WaveSurfer');
+        wavesurferRef.current.play();
+      } else {
+        console.log('Pausing audio with WaveSurfer');
+        wavesurferRef.current.pause();
+      }
+    } catch (err) {
+      console.error('Error controlling playback:', err);
+    }
+  }, [isPlaying, wavesurferReady]);
   
   return (
-    <canvas 
-      ref={canvasRef} 
+    <div
+      ref={waveformRef}
       className={styles.visualizer}
-      height="400"
+      style={{ width: '100%', height: '400px' }}
     />
-  )
+  );
 }
