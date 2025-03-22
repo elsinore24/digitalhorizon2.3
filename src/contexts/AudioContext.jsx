@@ -106,9 +106,6 @@ export function AudioProvider({ children }) {
     return audioRef.current
   }, [])
 
-  // Track if iOS audio has been unlocked
-  const [iOSAudioUnlocked, setIOSAudioUnlocked] = useState(false)
-  
   // Initialize the audio context when the component mounts
   useEffect(() => {
     // Initialize audio context
@@ -137,20 +134,6 @@ export function AudioProvider({ children }) {
       
       document.body.appendChild(audioElement)
       
-      // Create a silent audio element specifically for iOS audio unlock
-      if (isIOS) {
-        console.log('[iOS Audio Unlock] Creating silent audio element')
-        const silentAudio = document.createElement('audio')
-        silentAudio.id = 'ios-audio-unlock'
-        silentAudio.src = '/audio/utils/silent.mp3'
-        silentAudio.loop = false
-        silentAudio.preload = 'auto'
-        silentAudio.playsinline = true
-        silentAudio.muted = false
-        silentAudio.style.display = 'none'
-        document.body.appendChild(silentAudio)
-      }
-      
       // Resume audio context on user interaction (required by browsers)
       const resumeAudioContext = () => {
         console.log('User interaction detected, resuming audio context')
@@ -161,54 +144,17 @@ export function AudioProvider({ children }) {
             
             // For iOS, we need to unlock audio capabilities
             if (isIOS && !audioInitialized) {
-              console.log('[iOS Audio Unlock] Initializing audio on iOS')
+              console.log('Initializing audio on iOS')
               
-              // Play the silent audio to unlock iOS audio
+              // Play a short silent sound to unlock audio
               const unlockAudio = () => {
-                const silentAudio = document.getElementById('ios-audio-unlock')
-                if (silentAudio) {
-                  console.log('[iOS Audio Unlock] Playing silent audio to unlock iOS audio')
-                  
-                  // Play the silent audio
-                  silentAudio.play()
-                    .then(() => {
-                      console.log('[iOS Audio Unlock] Silent audio played successfully')
-                      setAudioInitialized(true)
-                      setIOSAudioUnlocked(true)
-                      
-                      // Also play a short oscillator sound to ensure Web Audio API is unlocked
-                      const oscillator = audioContext.createOscillator()
-                      oscillator.frequency.value = 1
-                      oscillator.connect(audioContext.destination)
-                      oscillator.start(0)
-                      oscillator.stop(0.001)
-                      
-                      console.log('[iOS Audio Unlock] iOS audio initialized')
-                    })
-                    .catch(err => {
-                      console.error('[iOS Audio Unlock] Failed to play silent audio:', err)
-                      
-                      // Fall back to oscillator method
-                      console.log('[iOS Audio Unlock] Falling back to oscillator method')
-                      const oscillator = audioContext.createOscillator()
-                      oscillator.frequency.value = 1
-                      oscillator.connect(audioContext.destination)
-                      oscillator.start(0)
-                      oscillator.stop(0.001)
-                      setAudioInitialized(true)
-                    })
-                } else {
-                  console.error('[iOS Audio Unlock] Silent audio element not found')
-                  
-                  // Fall back to oscillator method
-                  const oscillator = audioContext.createOscillator()
-                  oscillator.frequency.value = 1
-                  oscillator.connect(audioContext.destination)
-                  oscillator.start(0)
-                  oscillator.stop(0.001)
-                  setAudioInitialized(true)
-                  console.log('[iOS Audio Unlock] iOS audio initialized with oscillator')
-                }
+                const oscillator = audioContext.createOscillator()
+                oscillator.frequency.value = 1
+                oscillator.connect(audioContext.destination)
+                oscillator.start(0)
+                oscillator.stop(0.001)
+                setAudioInitialized(true)
+                console.log('iOS audio initialized')
               }
               
               unlockAudio()
@@ -573,66 +519,9 @@ export function AudioProvider({ children }) {
       const localUrl = getAudioUrl(`${dialogueId}.mp3`)
       console.log('Using local audio URL to avoid CORS:', localUrl)
 
-      // For iOS, ensure audio is unlocked before playing
+      // For iOS, use Tone.js which has better iOS compatibility and analyzer support
       if (isIOS) {
-        console.log('[iOS] Preparing for iOS playback')
-        
-        // Play silent audio first to unlock iOS audio
-        const playSilentAudio = () => {
-          return new Promise((resolve) => {
-            const silentAudio = document.getElementById('ios-audio-unlock')
-            if (silentAudio) {
-              console.log('[iOS] Playing silent audio to unlock iOS audio')
-              
-              // Clone the silent audio element to ensure it can be played again
-              const silentClone = silentAudio.cloneNode(true)
-              silentClone.onended = () => {
-                console.log('[iOS] Silent audio ended, proceeding with actual audio')
-                document.body.removeChild(silentClone)
-                resolve()
-              }
-              
-              silentClone.onerror = () => {
-                console.error('[iOS] Silent audio error, proceeding anyway')
-                if (silentClone.parentNode) {
-                  document.body.removeChild(silentClone)
-                }
-                resolve()
-              }
-              
-              // Add to DOM and play
-              document.body.appendChild(silentClone)
-              
-              silentClone.play()
-                .then(() => {
-                  console.log('[iOS] Silent audio playing')
-                })
-                .catch(err => {
-                  console.error('[iOS] Failed to play silent audio:', err)
-                  if (silentClone.parentNode) {
-                    document.body.removeChild(silentClone)
-                  }
-                  resolve() // Continue anyway
-                })
-              
-              // Set a timeout in case onended doesn't fire
-              setTimeout(() => {
-                console.log('[iOS] Silent audio timeout, proceeding anyway')
-                if (silentClone.parentNode) {
-                  document.body.removeChild(silentClone)
-                }
-                resolve()
-              }, 500)
-            } else {
-              console.warn('[iOS] Silent audio element not found, proceeding anyway')
-              resolve()
-            }
-          })
-        }
-        
-        // Play silent audio first, then the actual audio
-        await playSilentAudio()
-        console.log('[iOS] Using Tone.js for iOS playback')
+        console.log('[iOS] Using Tone.js exclusively for iOS playback')
         playAudioWithTone(localUrl, dialogueId, dialogue)
       } else {
         // For non-iOS, continue using the existing approach
