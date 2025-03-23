@@ -35,6 +35,43 @@ export default function ToneVisualizer() {
         return;
       }
 
+      // ==========================================================
+      // VISUALIZATION SETTINGS - Adjust these values as needed
+      // ==========================================================
+      
+      // === Color settings ===
+      // Set up colors - these define the gradient for the visualization
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, 'rgba(255, 105, 180, 1)'); // Top color - Hot pink
+      gradient.addColorStop(1, 'rgba(255, 165, 0, 1)');   // Bottom color - Orange
+      
+      ctx.fillStyle = gradient;
+      
+      // === Shape settings ===
+      // Number of bars to display - fewer bars = better performance but less detail
+      const barCount = 64; // SETTING: Number of bars in the visualization
+      
+      // Bar spacing - gap between bars (in pixels)
+      const barSpacing = 1; // SETTING: Space between bars
+      
+      // Calculate bar width based on canvas width and count
+      const barWidth = (width / barCount) - barSpacing;
+      
+      // === Animation settings ===
+      // How much the bars should move per frame
+      const animationSpeed = 0.1; // SETTING: How fast the animation moves
+      
+      // How pronounced the dome shape should be
+      const domeStrength = 0.6; // SETTING: Higher values = more pronounced dome (0.0-1.0)
+      
+      // Maximum height of visualization (as percentage of canvas height)
+      const maxHeightPercent = 0.9; // SETTING: Maximum height of bars (0.0-1.0)
+      
+      // Animation amplitude - how much the bars fluctuate
+      const animationAmplitude = 10; // SETTING: Higher values = more movement
+      
+      // ==========================================================
+
       // Create dummy data for visualization
       // Note: We're using dummy data for now since it seems analyzer data isn't working
       const dummyData = new Float32Array(128);
@@ -44,20 +81,9 @@ export default function ToneVisualizer() {
         const centerEffect = 1 - Math.abs((position * 2) - 1); // Higher in middle
         // Add some animation with time-based variation
         const time = Date.now() / 1000;
-        const animatedValue = Math.sin(position * 10 + time) * 10;
+        const animatedValue = Math.sin(position * 10 + time * animationSpeed) * animationAmplitude;
         dummyData[i] = -80 + (centerEffect * 50) + animatedValue; 
       }
-      
-      // Set up colors
-      const gradient = ctx.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, 'rgba(255, 105, 180, 1)'); // Hot pink
-      gradient.addColorStop(1, 'rgba(255, 165, 0, 1)');   // Orange
-      
-      ctx.fillStyle = gradient;
-      
-      // Draw dome-shaped visualization with bars
-      const barCount = 64; // Using fewer bars for better performance
-      const barWidth = width / barCount;
       
       // Calculate center position for dome effect
       const centerIndex = Math.floor(barCount / 2);
@@ -65,7 +91,7 @@ export default function ToneVisualizer() {
       for (let i = 0; i < barCount; i++) {
         // Apply dome shape multiplier - higher in the center, lower at edges
         const domePosition = 1 - Math.abs(i - centerIndex) / centerIndex;
-        const domeMultiplier = 0.4 + (domePosition * 0.6); // Scale between 0.4-1.0 for more pronounced dome
+        const domeMultiplier = 0.4 + (domePosition * domeStrength); // Scale between 0.4-1.0 for more pronounced dome
         
         // Get the frequency value and normalize it with some amplification
         // Map a subset of the frequency data to spread more evenly
@@ -78,14 +104,14 @@ export default function ToneVisualizer() {
         
         // Apply dome multiplier to create arch shape
         const enhancedValue = normalizedValue * domeMultiplier;
-        const barHeight = enhancedValue * height * 0.9; // Slightly reduce height to fit in canvas
+        const barHeight = enhancedValue * height * maxHeightPercent; // Scale height to fit in canvas
         
-        const x = i * barWidth;
+        const x = i * (barWidth + barSpacing);
         const y = height - barHeight;
         
         // Draw simple rectangles instead of using roundRect which might not be supported in all browsers
         ctx.beginPath();
-        ctx.rect(x, y, barWidth - 1, barHeight);
+        ctx.rect(x, y, barWidth, barHeight);
         ctx.fill();
       }
     } catch (error) {
@@ -138,6 +164,8 @@ export default function ToneVisualizer() {
     };
   }, []);
   
+  // Container size settings are here - controls the overall dimensions of the visualizer
+  // The stylesheet (AudioVisualizer.module.scss) also contains additional styling
   return (
     <div className={styles.visualizer} style={{ width: '100%', height: '400px' }}>
       <canvas
