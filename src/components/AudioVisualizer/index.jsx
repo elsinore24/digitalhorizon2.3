@@ -94,14 +94,14 @@ export default function AudioVisualizer() {
           const time = Date.now() / 1000
           
           // Make animation more dramatic for better visual effect
-          const animatedValue = Math.sin(position * 10 + time) * 20 + 
-                              Math.sin(position * 5 + time * 0.7) * 15 +
-                              Math.sin(position * 20 + time * 1.3) * 10
+          const animatedValue = Math.sin(position * 10 + time) * 30 + // Increased amplitude from 20 to 30
+                              Math.sin(position * 5 + time * 0.7) * 20 + // Increased from 15 to 20
+                              Math.sin(position * 20 + time * 1.3) * 15 // Increased from 10 to 15
           
           // Base value plus centered effect plus animation
           dataArray[i] = Math.min(255, Math.max(0, 
             Math.floor(isPlaying ? 
-              (100 + (centerEffect * 100) + animatedValue) : // Animated when playing
+              (110 + (centerEffect * 120) + animatedValue) : // Increased base values and center effect
               40 + (Math.sin(time) * 5)) // Subtle animation when not playing
           ))
         }
@@ -118,18 +118,26 @@ export default function AudioVisualizer() {
         const dataIndex = Math.floor(i * (dataArray.length / barCount))
         
         // Get the frequency value
-        const value = dataArray[dataIndex]
+        let value = dataArray[dataIndex]
         
         // Calculate position factor for dome shape (1 at center, 0 at edges)
         const normalizedDistance = distanceFromCenter / centerIndex
-        const positionFactor = Math.max(0, 1 - Math.pow(normalizedDistance, 1.5))
+        
+        // More pronounced dome effect with a steeper curve
+        const positionFactor = Math.max(0, 1 - Math.pow(normalizedDistance, 1.3)) // Changed from 1.5 to 1.3 for wider peak
+        
+        // Boost center bars even more (within 5 bars of center)
+        if (distanceFromCenter < 5) {
+          // Apply a multiplier to the frequency value for the center bars
+          value = Math.min(255, value * 1.4); // Boost by 40%
+        }
         
         // Scale the height based on the frequency value and position
-        // Reduced multiplier range for smaller bars
-        const heightMultiplier = 0.2 + (positionFactor * 1.8) // 0.2 at edges, 2.0 at center
+        // Increased multiplier range for taller center bars
+        const heightMultiplier = 0.2 + (positionFactor * 2.2) // Increased from 1.8 to 2.2
         
         // Calculate height based on frequency data with overall scaling factor
-        const height = (value / 255) * HEIGHT * heightMultiplier * 0.6 // Added 0.6 scaling factor to reduce overall height
+        const height = (value / 255) * HEIGHT * heightMultiplier * 0.7 // Increased from 0.6 to 0.7
         
         // Calculate the center line (vertically)
         const centerY = HEIGHT / 2
