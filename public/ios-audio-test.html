@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS Audio Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #000;
+            color: #0ff;
+        }
+        button {
+            background-color: #0ff;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: block;
+            width: 100%;
+        }
+        #visualizer {
+            width: 100%;
+            height: 200px;
+            background-color: #111;
+            margin: 20px 0;
+        }
+        .log {
+            font-family: monospace;
+            background-color: #111;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .status {
+            font-size: 14px;
+            margin: 10px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .success { background-color: #052; }
+        .error { background-color: #500; }
+        .pending { background-color: #550; }
+    </style>
+</head>
+<body>
+    <h1>iOS Audio Test</h1>
+    <p>This page tests audio playback and visualization on iOS devices.</p>
+    
+    <button id="playTestAudio">Play Test Audio</button>
+    <button id="testToneJS">Test Tone.js</button>
+    
+    <div class="status pending" id="audioStatus">Audio Status: Not Started</div>
+    <div class="status pending" id="visualizerStatus">Visualizer Status: Not Started</div>
+    
+    <canvas id="visualizer"></canvas>
+    
+    <div class="log" id="logOutput"></div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script>
+        // Logging function
+        function log(message) {
+            const logElement = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}<br>`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+        
+        // Status updates
+        function updateStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status ${type}`;
+        }
+        
+        // Main audio elements and contexts
+        let audioContext;
+        let analyzer;
+        let audioElement;
+        let mediaSource;
+        let animationFrame;
+        let toneAnalyzer;
+        let tonePlayer;
+        
+        // Initialize audio context
+        async function initAudio() {
+            try {
+                // Create audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                log('Audio context created');
+                
+                // Create audio element
+                audioElement = new Audio();
+                audioElement.crossOrigin = 'anonymous';
+                audioElement.preload = 'auto';
+                audioElement.playsinline = true;
+                audioElement.setAttribute('webkit-playsinline', 'true');
+                audioElement.src = '/audio/narration/lunar_arrival_intro.mp3';
+                
+                log('Audio element created and configured');
+                updateStatus('audioStatus', 'Audio Status: Initialized', 'pending');
+                
+                return true;
+            } catch (error) {
+                log(`Error initializing audio: ${error.message}`);
+                updateStatus('audioStatus', `Audio Status: Error - ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Set up analyzer
+        function setupAnalyzer() {
+            try {
+                // Create analyzer
+                analyzer = audioContext.createAnalyser();
+                analyzer.fftSize = 256;
+                
+                // Create media source
+                mediaSource = audioContext.createMediaElementSource(audioElement);
+                mediaSource.connect(analyzer);
+                analyzer.connect(audioContext.destination);
+                
+                log('Audio analyzer connected');
+                setupVisualizer();
+                updateStatus('visualizerStatus', 'Visualizer Status: Ready', 'success');
+                return true;
+            } catch (error) {
+                log(`Error setting up analyzer: ${error.message}`);
+                updateStatus('visualizerStatus', `Visualizer Status: Error - ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Set up Tone.js
+        async function setupToneJS() {
+            try {
+                // Start Tone.js
+                await Tone.start();
+                log('Tone.js started');
+                
+                // Create Tone.js player
+                tonePlayer = new Tone.Player({
+                    url: '/audio/narration/lunar_arrival_intro.mp3',
+                    autostart: false,
+                    loop: false,
+                    onload: () => {
+                        log('Tone.js player loaded');
+                        
+                        // Create analyzer
+                        toneAnalyzer = new Tone.Analyser('fft', 256);
+                        tonePlayer.connect(toneAnalyzer);
+                        
+                        log('Tone.js analyzer connected');
+                        updateStatus('visualizerStatus', 'Tone.js Visualizer: Ready', 'success');
+                    },
+                    onerror: (error) => {
+                        log(`Tone.js player error: ${error}`);
+                        updateStatus('visualizerStatus', `Tone.js Visualizer: Error`, 'error');
+                    }
+                });
+                
+                return true;
+            } catch (error) {
+                log(`Error setting up Tone.js: ${error.message}`);
+                return false;
+            }
+        }
+        
+        // Draw visualizer
+        function setupVisualizer() {
+            const canvas = document.getElementById('visualizer');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            function draw() {
+                // Get canvas dimensions
+                const WIDTH = canvas.width;
+                const HEIGHT = canvas.height;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, WIDTH, HEIGHT);
+                
+                // Check which analyzer to use
+                let dataArray;
+                let bufferLength;
+                
+                if (analyzer) {
+                    // Web Audio API
+                    bufferLength = analyzer.frequencyBinCount;
+                    dataArray = new Uint8Array(bufferLength);
+                    analyzer.getByteFrequencyData(dataArray);
+                } else if (toneAnalyzer) {
+                    // Tone.js
+                    const toneFftData = toneAnalyzer.getValue();
+                    
+                    // Convert from dB (-100 to 0) to 0-255
+                    bufferLength = toneFftData.length;
+                    dataArray = new Uint8Array(bufferLength);
+                    
+                    for (let i = 0; i < bufferLength; i++) {
+                        // Map -100..0 to 0..255
+                        dataArray[i] = Math.max(0, Math.min(255, ((toneFftData[i] + 100) / 100) * 255));
+                    }
+                } else {
+                    // No analyzer, use dummy data
+                    bufferLength = 128;
+                    dataArray = new Uint8Array(bufferLength);
+                    const time = Date.now() / 1000;
+                    
+                    for (let i = 0; i < bufferLength; i++) {
+                        const position = i / bufferLength;
+                        const centerEffect = 1 - Math.abs((position * 2) - 1);
+                        const animationValue = Math.sin(position * 10 + time) * 20;
+                        dataArray[i] = 128 + (centerEffect * 70) + animationValue;
+                    }
+                }
+                
+                // Draw bars
+                const barWidth = (WIDTH / bufferLength) * 2.5;
+                let x = 0;
+                
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * HEIGHT;
+                    
+                    // Create gradient
+                    const gradient = ctx.createLinearGradient(0, HEIGHT - barHeight, 0, HEIGHT);
+                    gradient.addColorStop(0, '#0ff');
+                    gradient.addColorStop(1, '#005');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
+                    
+                    x += barWidth + 1;
+                }
+                
+                animationFrame = requestAnimationFrame(draw);
+            }
+            
+            draw();
+        }
+        
+        // Play audio with HTML5 Audio
+        async function playAudio() {
+            try {
+                // Resume audio context
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                    log('Audio context resumed');
+                }
+                
+                // Play audio
+                await audioElement.play();
+                log('Audio playing');
+                updateStatus('audioStatus', 'Audio Status: Playing', 'success');
+                return true;
+            } catch (error) {
+                log(`Error playing audio: ${error.message}`);
+                updateStatus('audioStatus', `Audio Status: Error - ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Play audio with Tone.js
+        async function playToneAudio() {
+            try {
+                // Resume Tone context
+                if (Tone.context.state !== 'running') {
+                    await Tone.context.resume();
+                    log('Tone context resumed');
+                }
+                
+                // Play audio
+                if (tonePlayer.loaded) {
+                    tonePlayer.start();
+                    log('Tone.js audio playing');
+                    updateStatus('audioStatus', 'Tone.js Audio Status: Playing', 'success');
+                    return true;
+                } else {
+                    log('Tone.js player not loaded yet');
+                    updateStatus('audioStatus', 'Tone.js Audio Status: Not loaded', 'error');
+                    return false;
+                }
+            } catch (error) {
+                log(`Error playing Tone.js audio: ${error.message}`);
+                updateStatus('audioStatus', `Tone.js Audio Status: Error - ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Initialize everything
+        document.addEventListener('DOMContentLoaded', async () => {
+            log('Page loaded');
+            
+            // Initialize audio
+            const audioInitialized = await initAudio();
+            
+            // Set up event listeners
+            document.getElementById('playTestAudio').addEventListener('click', async () => {
+                log('Play button clicked');
+                
+                if (!audioInitialized) {
+                    await initAudio();
+                }
+                
+                // Setup analyzer if not done yet
+                if (!analyzer && audioContext) {
+                    setupAnalyzer();
+                }
+                
+                // Play audio
+                playAudio();
+            });
+            
+            document.getElementById('testToneJS').addEventListener('click', async () => {
+                log('Tone.js test button clicked');
+                
+                // Set up Tone.js if not done yet
+                if (!tonePlayer) {
+                    await setupToneJS();
+                }
+                
+                // Play Tone.js audio
+                playToneAudio();
+            });
+        });
+    </script>
+</body>
+</html>
