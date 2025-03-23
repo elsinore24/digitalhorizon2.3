@@ -28,62 +28,47 @@ export default function ToneVisualizer() {
     ctx.clearRect(0, 0, width, height);
     
     try {
+      // Only attempt to get frequency data if analyzer exists and audio is playing
+      if (!analyzer || !isPlaying) {
+        // Clear the canvas if not playing - no visualization when silent
+        rafRef.current = requestAnimationFrame(drawVisualizer);
+        return;
+      }
+      
       // Get frequency data from analyzer, with safety checks
       let frequencyData;
       
-      if (analyzer) {
-        try {
-          // Try using Tone.js Analyser's getValue method
-          if (typeof analyzer.getValue === 'function') {
-            frequencyData = analyzer.getValue();
-          } 
-          // Fall back to getFrequencyData if getValue isn't available
-          else if (analyzer.getFrequencyData) {
-            const dataArray = new Float32Array(analyzer.frequencyBinCount || 128);
-            analyzer.getFrequencyData(dataArray);
-            frequencyData = dataArray;
-          }
-          // Direct access as a last resort
-          else if (analyzer.analyser && analyzer.analyser.getFloatFrequencyData) {
-            const dataArray = new Float32Array(analyzer.analyser.frequencyBinCount || 128);
-            analyzer.analyser.getFloatFrequencyData(dataArray);
-            frequencyData = dataArray;
-          }
-          // If we still don't have data, create dummy data for visualization
-          else {
-            console.log('Falling back to dummy data for visualization');
-            frequencyData = new Float32Array(128).fill(-50);
-          }
-        } catch (error) {
-          console.error('Error accessing analyzer data:', error);
-          frequencyData = new Float32Array(128).fill(-50);
+      try {
+        // Try using Tone.js Analyser's getValue method
+        if (typeof analyzer.getValue === 'function') {
+          frequencyData = analyzer.getValue();
+        } 
+        // Fall back to getFrequencyData if getValue isn't available
+        else if (analyzer.getFrequencyData) {
+          const dataArray = new Float32Array(analyzer.frequencyBinCount || 128);
+          analyzer.getFrequencyData(dataArray);
+          frequencyData = dataArray;
         }
-      } else {
-        // No analyzer available, use dummy data
-        frequencyData = new Float32Array(128).fill(-50);
+        // Direct access as a last resort
+        else if (analyzer.analyser && analyzer.analyser.getFloatFrequencyData) {
+          const dataArray = new Float32Array(analyzer.analyser.frequencyBinCount || 128);
+          analyzer.analyser.getFloatFrequencyData(dataArray);
+          frequencyData = dataArray;
+        } else {
+          // If we can't get data, just return and try again next frame
+          rafRef.current = requestAnimationFrame(drawVisualizer);
+          return;
+        }
+      } catch (error) {
+        console.error('Error accessing analyzer data:', error);
+        rafRef.current = requestAnimationFrame(drawVisualizer);
+        return;
       }
       
-      // Use dummy data with animated values when no real data is available
+      // Stop if we have no data
       if (!frequencyData || frequencyData.length === 0) {
-        frequencyData = new Float32Array(128);
-        const time = Date.now() / 1000; // Get current time in seconds
-        
-        for (let i = 0; i < frequencyData.length; i++) {
-          // Create a smooth wave pattern that changes over time
-          const position = i / frequencyData.length;
-          const wave = Math.sin(position * 10 + time) * 0.5 + 0.5; // Oscillates between 0 and 1
-          
-          // Animate values for interesting visualization when no audio is playing
-          frequencyData[i] = -80 + (wave * 50); // Range from -80 to -30 dB
-        }
-      }
-      
-      // If isPlaying is false, gradually reduce the values to create a calming effect
-      if (!isPlaying && frequencyData) {
-        for (let i = 0; i < frequencyData.length; i++) {
-          // Make values smaller when not playing (quieter visualization)
-          frequencyData[i] = Math.min(frequencyData[i], -50);
-        }
+        rafRef.current = requestAnimationFrame(drawVisualizer);
+        return;
       }
       
       // Set up colors
@@ -93,8 +78,9 @@ export default function ToneVisualizer() {
       
       ctx.fillStyle = gradient;
       
-      // Draw dome-shaped visualization with bars
-      const barCount = frequencyData.length;
+  // Draw dome-shaped visualization with bars
+      // Use fixed number of bars for better visualization
+      const barCount = Math.min(frequencyData.length, 128);
       const barWidth = width / barCount;
       
       // Calculate center position for dome effect
@@ -103,13 +89,16 @@ export default function ToneVisualizer() {
       for (let i = 0; i < barCount; i++) {
         // Apply dome shape multiplier - higher in the center, lower at edges
         const domePosition = 1 - Math.abs(i - centerIndex) / centerIndex;
-        const domeMultiplier = 0.3 + (domePosition * 0.7); // Scale between 0.3-1.0
+        const domeMultiplier = 0.4 + (domePosition * 0.6); // Scale between 0.4-1.0 for more pronounced dome
         
-        // Get the frequency value and normalize it
-        const value = frequencyData[i];
+        // Get the frequency value and normalize it with some amplification
+        // Map a subset of the frequency data to spread more evenly
+        const dataIndex = Math.floor(i * (frequencyData.length / barCount));
+        const value = frequencyData[dataIndex] || -80;
+        
         // For Tone.js FFT analyzer, values are in dB (-100 to 0)
-        // Convert to a 0-1 range for visualization
-        const normalizedValue = (value + 100) / 100;
+        // Convert to a 0-1 range for visualization with amplification
+        const normalizedValue = Math.min(1, (value + 100) / 80); // Amplify by dividing by 80 instead of 100
         
         // Apply dome multiplier to create arch shape
         const enhancedValue = normalizedValue * domeMultiplier;
@@ -131,7 +120,7 @@ export default function ToneVisualizer() {
     rafRef.current = requestAnimationFrame(drawVisualizer);
   }, [analyzer]);
   
-  // Set up canvas and start animation loop
+  // Set up canvas and start animation loop only when playing
   useEffect(() => {
     if (!canvasRef.current) return;
     
@@ -140,9 +129,19 @@ export default function ToneVisualizer() {
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
     
-    // Always start animation loop, even if not playing - will use dummy data
-    console.log('Starting visualizer animation');
-    rafRef.current = requestAnimationFrame(drawVisualizer);
+    // Only start animation when audio is playing
+    if (isPlaying) {
+      console.log('Starting visualizer animation');
+      rafRef.current = requestAnimationFrame(drawVisualizer);
+    } else if (rafRef.current) {
+      // Clear the animation if we're not playing
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      
+      // Clear the canvas when not playing
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
     
     // Clean up on unmount or when not playing
     return () => {
