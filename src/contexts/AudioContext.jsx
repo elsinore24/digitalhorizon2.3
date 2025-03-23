@@ -1,5 +1,6 @@
 import { createContext, useState, useRef, useCallback, useEffect } from 'react'
 import dialogueData from '../data/dialogue.json'
+import * as Tone from 'tone'
 
 export const AudioContext = createContext(null)
 
@@ -16,10 +17,18 @@ export function AudioProvider({ children }) {
   const audioRef = useRef(null)
   const [isIOS, setIsIOS] = useState(false)
 
+  // Audio-related refs
+  const audioContextRef = useRef(null)
+  const audioElementRef = useRef(null)
+  const analyzerRef = useRef(null)
+  const mediaStreamSourceRef = useRef(null)
+  const [audioInitialized, setAudioInitialized] = useState(false)
+  
   // Check if we're on iOS
   useEffect(() => {
-    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream)
-    console.log('iOS device detected:', isIOS)
+    const iOSDetected = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+    setIsIOS(iOSDetected)
+    console.log('iOS device detected:', iOSDetected)
   }, [])
 
   const getAudioInstance = useCallback(() => {
@@ -29,33 +38,69 @@ export function AudioProvider({ children }) {
   // Track if iOS audio has been unlocked
   const [iOSAudioUnlocked, setIOSAudioUnlocked] = useState(false)
   
+  // Initialize audio context and audio element
+  const initAudioContext = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Create audio context if it doesn't exist
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        console.log('Audio context created successfully');
+      } catch (err) {
+        console.error('Failed to create audio context:', err);
+      }
+    }
+  }, []);
+  
+  // Connect analyzer to audio element
+  const connectAnalyzerToAudio = useCallback(() => {
+    if (!audioElementRef.current || !audioContextRef.current) return;
+    
+    try {
+      // Create analyzer if it doesn't exist
+      if (!analyzerRef.current) {
+        analyzerRef.current = audioContextRef.current.createAnalyser();
+        analyzerRef.current.fftSize = 256;
+      }
+      
+      // Create media stream source if it doesn't exist
+      if (!mediaStreamSourceRef.current) {
+        mediaStreamSourceRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+        mediaStreamSourceRef.current.connect(analyzerRef.current);
+        analyzerRef.current.connect(audioContextRef.current.destination);
+      }
+      
+      console.log('Audio analyzer connected successfully');
+    } catch (err) {
+      console.error('Failed to connect analyzer:', err);
+    }
+  }, []);
+  
   // Initialize the audio context when the component mounts
   useEffect(() => {
     // Initialize audio context
-    initAudioContext()
+    initAudioContext();
     
     // Set up audio element for capturing
     if (typeof window !== 'undefined') {
-      // Check if we're on iOS
-      isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
-      console.log('iOS device detected:', isIOS)
-      
       // Create a hidden audio element for capturing
-      audioElement = document.createElement('audio')
-      audioElement.id = 'audio-visualizer-source'
-      audioElement.crossOrigin = 'anonymous' // Add this to help with CORS
-      audioElement.style.display = 'none'
-      audioElement.preload = 'auto'
+      const audioElement = document.createElement('audio');
+      audioElement.id = 'audio-visualizer-source';
+      audioElement.crossOrigin = 'anonymous'; // Add this to help with CORS
+      audioElement.style.display = 'none';
+      audioElement.preload = 'auto';
       
       // For iOS Safari, we need to set these attributes
       if (isIOS) {
-        audioElement.controls = true
-        audioElement.playsinline = true
-        audioElement.muted = false
-        audioElement.autoplay = false
+        audioElement.controls = true;
+        audioElement.playsinline = true;
+        audioElement.muted = false;
+        audioElement.autoplay = false;
       }
       
-      document.body.appendChild(audioElement)
+      document.body.appendChild(audioElement);
+      audioElementRef.current = audioElement;
       
       // Create a silent audio element specifically for iOS audio unlock
       if (isIOS) {
@@ -75,8 +120,8 @@ export function AudioProvider({ children }) {
       const resumeAudioContext = () => {
         console.log('User interaction detected, resuming audio context')
         
-        if (audioContext && audioContext.state === 'suspended') {
-          audioContext.resume().then(() => {
+        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+          audioContextRef.current.resume().then(() => {
             console.log('AudioContext resumed successfully')
             
             // For iOS, we need to unlock audio capabilities
@@ -90,16 +135,16 @@ export function AudioProvider({ children }) {
                   console.log('[iOS Audio Unlock] Playing silent audio to unlock iOS audio')
                   
                   // Play the silent audio
-                  silentAudio.play()
+                silentAudio.play()
                     .then(() => {
                       console.log('[iOS Audio Unlock] Silent audio played successfully')
                       setAudioInitialized(true)
                       setIOSAudioUnlocked(true)
                       
                       // Also play a short oscillator sound to ensure Web Audio API is unlocked
-                      const oscillator = audioContext.createOscillator()
+                      const oscillator = audioContextRef.current.createOscillator()
                       oscillator.frequency.value = 1
-                      oscillator.connect(audioContext.destination)
+                      oscillator.connect(audioContextRef.current.destination)
                       oscillator.start(0)
                       oscillator.stop(0.001)
                       
@@ -110,9 +155,9 @@ export function AudioProvider({ children }) {
                       
                       // Fall back to oscillator method
                       console.log('[iOS Audio Unlock] Falling back to oscillator method')
-                      const oscillator = audioContext.createOscillator()
+                      const oscillator = audioContextRef.current.createOscillator()
                       oscillator.frequency.value = 1
-                      oscillator.connect(audioContext.destination)
+                      oscillator.connect(audioContextRef.current.destination)
                       oscillator.start(0)
                       oscillator.stop(0.001)
                       setAudioInitialized(true)
@@ -121,9 +166,9 @@ export function AudioProvider({ children }) {
                   console.error('[iOS Audio Unlock] Silent audio element not found')
                   
                   // Fall back to oscillator method
-                  const oscillator = audioContext.createOscillator()
+                  const oscillator = audioContextRef.current.createOscillator()
                   oscillator.frequency.value = 1
-                  oscillator.connect(audioContext.destination)
+                  oscillator.connect(audioContextRef.current.destination)
                   oscillator.start(0)
                   oscillator.stop(0.001)
                   setAudioInitialized(true)
@@ -146,21 +191,21 @@ export function AudioProvider({ children }) {
     
     return () => {
       // Clean up
-      if (mediaStreamSource) {
+      if (mediaStreamSourceRef.current) {
         try {
-          mediaStreamSource.disconnect()
+          mediaStreamSourceRef.current.disconnect()
         } catch (e) {
           // Ignore disconnection errors
         }
       }
       
-      if (audioElement && audioElement.parentNode) {
-        audioElement.parentNode.removeChild(audioElement)
+      if (audioElementRef.current && audioElementRef.current.parentNode) {
+        audioElementRef.current.parentNode.removeChild(audioElementRef.current)
       }
       
-      if (audioContext) {
+      if (audioContextRef.current) {
         try {
-          audioContext.close()
+          audioContextRef.current.close()
         } catch (e) {
           // Ignore close errors
         }
@@ -170,11 +215,11 @@ export function AudioProvider({ children }) {
 
   // Play audio using HTML5 Audio element
   const playAudioWithElement = useCallback((url, dialogueId, dialogue) => {
-    if (!audioElement) return false
+    if (!audioElementRef.current) return false
     
     try {
-      audioElement.src = url
-      audioElement.onloadeddata = () => {
+      audioElementRef.current.src = url
+      audioElementRef.current.onloadeddata = () => {
         console.log('Audio loaded:', dialogueId)
         setCurrentDialogue(dialogue)
         
@@ -182,7 +227,7 @@ export function AudioProvider({ children }) {
         connectAnalyzerToAudio()
         
         // Play the audio
-        audioElement.play()
+        audioElementRef.current.play()
           .then(() => {
             console.log('Audio playing:', dialogueId)
             setIsPlaying(true)
@@ -194,13 +239,13 @@ export function AudioProvider({ children }) {
           })
       }
       
-      audioElement.onended = () => {
+      audioElementRef.current.onended = () => {
         console.log('Audio ended:', dialogueId)
         setIsPlaying(false)
         setCurrentDialogue(null)
       }
       
-      audioElement.onerror = (err) => {
+      audioElementRef.current.onerror = (err) => {
         console.error('Audio error:', err)
         return false
       }
@@ -262,8 +307,8 @@ export function AudioProvider({ children }) {
               console.log('[iOS Hybrid] Connecting player to analyzer')
               player.connect(toneAnalyzer)
               
-              // Store the analyzer in our global analyzer variable
-              analyzer = toneAnalyzer
+              // Store the analyzer in our ref
+              analyzerRef.current = toneAnalyzer
               
               // Log analyzer state before playback
               console.log('[iOS Hybrid] Analyzer created, initial values:', toneAnalyzer.getValue().slice(0, 5))
@@ -372,9 +417,10 @@ export function AudioProvider({ children }) {
     }
   }, [])
   
-  // Play audio using Howler as fallback
-  const playAudioWithHowler = useCallback((url, dialogueId, dialogue) => {
+  // Main function to play narration audio
+  const playNarration = useCallback(async (dialogueId) => {
     try {
+      // Get dialogue data
       const dialogue = dialogueData[dialogueId]
       if (!dialogue) {
         console.warn(`Dialogue ID "${dialogueId}" not found`)
@@ -454,9 +500,9 @@ export function AudioProvider({ children }) {
         // Try to play using the audio element first
         const elementSuccess = playAudioWithElement(localUrl, dialogueId, dialogue)
         
-        // If audio element fails, fall back to Howler
+        // If audio element fails, use Tone.js as fallback
         if (!elementSuccess) {
-          playAudioWithHowler(localUrl, dialogueId, dialogue)
+          playAudioWithTone(localUrl, dialogueId, dialogue)
         }
       }
     } catch (err) {
@@ -484,7 +530,8 @@ export function AudioProvider({ children }) {
       isPlaying,
       currentTrack,
       currentDialogue,
-      isIOS
+      isIOS,
+      analyzer: analyzerRef.current
     }}>
       {children}
     </AudioContext.Provider>
