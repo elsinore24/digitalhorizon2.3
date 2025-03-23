@@ -17,7 +17,7 @@ export default function ToneVisualizer() {
 
   // Drawing logic for the visualizer
   const drawVisualizer = useCallback(() => {
-    if (!canvasRef.current || !analyzer) return;
+    if (!canvasRef.current) return;
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -28,13 +28,62 @@ export default function ToneVisualizer() {
     ctx.clearRect(0, 0, width, height);
     
     try {
-      // Get frequency data from analyzer
-      const frequencyData = analyzer.getValue();
+      // Get frequency data from analyzer, with safety checks
+      let frequencyData;
       
-      // Stop if we have no data
+      if (analyzer) {
+        try {
+          // Try using Tone.js Analyser's getValue method
+          if (typeof analyzer.getValue === 'function') {
+            frequencyData = analyzer.getValue();
+          } 
+          // Fall back to getFrequencyData if getValue isn't available
+          else if (analyzer.getFrequencyData) {
+            const dataArray = new Float32Array(analyzer.frequencyBinCount || 128);
+            analyzer.getFrequencyData(dataArray);
+            frequencyData = dataArray;
+          }
+          // Direct access as a last resort
+          else if (analyzer.analyser && analyzer.analyser.getFloatFrequencyData) {
+            const dataArray = new Float32Array(analyzer.analyser.frequencyBinCount || 128);
+            analyzer.analyser.getFloatFrequencyData(dataArray);
+            frequencyData = dataArray;
+          }
+          // If we still don't have data, create dummy data for visualization
+          else {
+            console.log('Falling back to dummy data for visualization');
+            frequencyData = new Float32Array(128).fill(-50);
+          }
+        } catch (error) {
+          console.error('Error accessing analyzer data:', error);
+          frequencyData = new Float32Array(128).fill(-50);
+        }
+      } else {
+        // No analyzer available, use dummy data
+        frequencyData = new Float32Array(128).fill(-50);
+      }
+      
+      // Use dummy data with animated values when no real data is available
       if (!frequencyData || frequencyData.length === 0) {
-        rafRef.current = requestAnimationFrame(drawVisualizer);
-        return;
+        frequencyData = new Float32Array(128);
+        const time = Date.now() / 1000; // Get current time in seconds
+        
+        for (let i = 0; i < frequencyData.length; i++) {
+          // Create a smooth wave pattern that changes over time
+          const position = i / frequencyData.length;
+          const wave = Math.sin(position * 10 + time) * 0.5 + 0.5; // Oscillates between 0 and 1
+          
+          // Animate values for interesting visualization when no audio is playing
+          frequencyData[i] = -80 + (wave * 50); // Range from -80 to -30 dB
+        }
+      }
+      
+      // If isPlaying is false, gradually reduce the values to create a calming effect
+      if (!isPlaying && frequencyData) {
+        for (let i = 0; i < frequencyData.length; i++) {
+          // Make values smaller when not playing (quieter visualization)
+          frequencyData[i] = Math.min(frequencyData[i], -50);
+        }
       }
       
       // Set up colors
@@ -91,11 +140,9 @@ export default function ToneVisualizer() {
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
     
-    // Start animation loop if playing
-    if (isPlaying && analyzer) {
-      console.log('Starting Tone.js visualizer animation');
-      rafRef.current = requestAnimationFrame(drawVisualizer);
-    }
+    // Always start animation loop, even if not playing - will use dummy data
+    console.log('Starting visualizer animation');
+    rafRef.current = requestAnimationFrame(drawVisualizer);
     
     // Clean up on unmount or when not playing
     return () => {
