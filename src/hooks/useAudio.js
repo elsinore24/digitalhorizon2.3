@@ -26,7 +26,7 @@ export default function useAudio() {
     if (context && context.getAnalyzerData) {
       return context.getAnalyzerData()
     }
-    return null
+    return new Float32Array(0)
   }, [context])
   
   // Return a consistent object shape every time

@@ -34,6 +34,14 @@ export function AudioProvider({ children }) {
   const getAudioInstance = useCallback(() => {
     return audioRef.current
   }, [])
+  
+  // Method to get analyzer data for visualization
+  const getAnalyzerData = useCallback(() => {
+    if (analyzerRef.current) {
+      return analyzerRef.current.getValue();
+    }
+    return new Float32Array(0);
+  }, [])
 
   // Track if iOS audio has been unlocked
   const [iOSAudioUnlocked, setIOSAudioUnlocked] = useState(false)
@@ -527,6 +535,7 @@ export function AudioProvider({ children }) {
       stopNarration,
       handleNarrationEnd,
       getAudioInstance,
+      getAnalyzerData,
       isPlaying,
       currentTrack,
       currentDialogue,
