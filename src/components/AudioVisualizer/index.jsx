@@ -5,7 +5,7 @@ import styles from './AudioVisualizer.module.scss'
 export default function AudioVisualizer() {
   const canvasRef = useRef(null)
   const animationRef = useRef(null)
-  const { isPlaying, getAnalyzerData } = useAudio()
+  const { isPlaying, getAnalyzerData, analyzer } = useAudio()
   const [isIOS, setIsIOS] = useState(false)
   
   // Check if we're on iOS
@@ -47,15 +47,64 @@ export default function AudioVisualizer() {
       // Calculate exact center index
       const centerIndex = Math.floor(barCount / 2)
       
-      // Create dummy data for visualization
-      // This will show a nice animation regardless of whether real analyzer data is available
-      const dummyData = new Uint8Array(128);
-      for (let i = 0; i < dummyData.length; i++) {
-        const position = i / dummyData.length;
-        const centerEffect = 1 - Math.abs((position * 2) - 1); // Higher in middle
-        const time = Date.now() / 1000;
-        const animatedValue = Math.sin(position * 10 + time) * 20;
-        dummyData[i] = Math.min(255, Math.max(0, Math.floor(128 + (centerEffect * 70) + animatedValue)));
+      // Try to get real audio data first
+      let dataArray = null
+      let useRealData = false
+      
+      try {
+        if (analyzer && analyzer.getByteFrequencyData) {
+          // Try to use Web Audio API's analyzer node directly
+          const tempArray = new Uint8Array(analyzer.frequencyBinCount);
+          analyzer.getByteFrequencyData(tempArray);
+          dataArray = tempArray;
+          useRealData = true;
+        } else {
+          // Fall back to getAnalyzerData which might use Tone.js
+          const analyzerData = getAnalyzerData()
+          
+          // Check if we got valid data
+          if (analyzerData && analyzerData.length > 0) {
+            // Convert to 0-255 range needed for visualization
+            dataArray = new Uint8Array(analyzerData.length)
+            
+            // Convert from dB (-100 to 0 range) to 0-255 range for visualization
+            for (let i = 0; i < analyzerData.length; i++) {
+              // Tone.js FFT analyzer returns values in dB from -100 to 0
+              // Map -100..0 to 0..255
+              dataArray[i] = Math.max(0, Math.min(255, 
+                Math.floor(((analyzerData[i] + 100) / 100) * 255)
+              ))
+            }
+            
+            useRealData = true
+          }
+        }
+      } catch (err) {
+        // Fallback to dummy data if error
+        console.log('Using fallback visualization data', err)
+      }
+      
+      // If we couldn't get valid analyzer data, create dummy data
+      if (!useRealData) {
+        // Create dummy data for visualization that animates with time
+        dataArray = new Uint8Array(128)
+        for (let i = 0; i < dataArray.length; i++) {
+          const position = i / dataArray.length
+          const centerEffect = 1 - Math.abs((position * 2) - 1) // Higher in middle
+          const time = Date.now() / 1000
+          
+          // Make animation more dramatic for better visual effect
+          const animatedValue = Math.sin(position * 10 + time) * 20 + 
+                              Math.sin(position * 5 + time * 0.7) * 15 +
+                              Math.sin(position * 20 + time * 1.3) * 10
+          
+          // Base value plus centered effect plus animation
+          dataArray[i] = Math.min(255, Math.max(0, 
+            Math.floor(isPlaying ? 
+              (100 + (centerEffect * 100) + animatedValue) : // Animated when playing
+              40 + (Math.sin(time) * 5)) // Subtle animation when not playing
+          ))
+        }
       }
       
       // Draw the bars
@@ -65,11 +114,11 @@ export default function AudioVisualizer() {
         // Calculate distance from center (0 at center, increases toward edges)
         const distanceFromCenter = Math.abs(i - centerIndex)
         
-        // Get position in dummy data
-        const dataIndex = Math.floor(i * (dummyData.length / barCount))
+        // Get position in data array
+        const dataIndex = Math.floor(i * (dataArray.length / barCount))
         
         // Get the frequency value
-        const value = dummyData[dataIndex]
+        const value = dataArray[dataIndex]
         
         // Calculate position factor for dome shape (1 at center, 0 at edges)
         const normalizedDistance = distanceFromCenter / centerIndex
@@ -121,7 +170,7 @@ export default function AudioVisualizer() {
         cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [isPlaying, getAnalyzerData, isIOS])
+  }, [isPlaying, getAnalyzerData, analyzer, isIOS])
   
   useEffect(() => {
     // Function to resize canvas to half window width
