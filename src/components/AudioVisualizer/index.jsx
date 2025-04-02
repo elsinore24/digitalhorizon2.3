@@ -51,6 +51,9 @@ export default function AudioVisualizer() {
       let dataArray = null
       let useRealData = false
       
+      console.log('Analyzer state:', analyzer ? 'exists' : 'null',
+                  analyzer && analyzer.getByteFrequencyData ? 'has getByteFrequencyData' : 'no getByteFrequencyData');
+      
       try {
         if (analyzer && analyzer.getByteFrequencyData) {
           // Try to use Web Audio API's analyzer node directly
@@ -58,9 +61,12 @@ export default function AudioVisualizer() {
           analyzer.getByteFrequencyData(tempArray);
           dataArray = tempArray;
           useRealData = true;
+          console.log('Using REAL audio data from Web Audio API analyzer', tempArray.slice(0, 5));
         } else {
           // Fall back to getAnalyzerData which might use Tone.js
           const analyzerData = getAnalyzerData()
+          console.log('getAnalyzerData result:', analyzerData ? `array of length ${analyzerData.length}` : 'null/empty',
+                      analyzerData && analyzerData.length > 0 ? `first values: ${analyzerData.slice(0, 5)}` : '');
           
           // Check if we got valid data
           if (analyzerData && analyzerData.length > 0) {
@@ -71,12 +77,13 @@ export default function AudioVisualizer() {
             for (let i = 0; i < analyzerData.length; i++) {
               // Tone.js FFT analyzer returns values in dB from -100 to 0
               // Map -100..0 to 0..255
-              dataArray[i] = Math.max(0, Math.min(255, 
+              dataArray[i] = Math.max(0, Math.min(255,
                 Math.floor(((analyzerData[i] + 100) / 100) * 255)
               ))
             }
             
             useRealData = true
+            console.log('Using REAL audio data from Tone.js analyzer', dataArray.slice(0, 5));
           }
         }
       } catch (err) {
@@ -86,6 +93,7 @@ export default function AudioVisualizer() {
       
       // If we couldn't get valid analyzer data, create dummy data
       if (!useRealData) {
+        console.log('Using SIMULATED audio data for visualization')
         // Create dummy data for visualization that animates with time
         dataArray = new Uint8Array(128)
         for (let i = 0; i < dataArray.length; i++) {

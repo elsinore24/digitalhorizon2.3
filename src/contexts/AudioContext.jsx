@@ -76,8 +76,22 @@ export function AudioProvider({ children }) {
     // Create audio context if it doesn't exist
     if (!audioContextRef.current) {
       try {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-        console.log('Audio context created successfully');
+        // Use a singleton pattern to ensure we only create one audio context
+        if (!window.globalAudioContext) {
+          window.globalAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+          console.log('Global audio context created successfully');
+        }
+        
+        // Use the global audio context
+        audioContextRef.current = window.globalAudioContext;
+        console.log('Using global audio context');
+        
+        // Resume the context if it's suspended
+        if (audioContextRef.current.state === 'suspended') {
+          audioContextRef.current.resume()
+            .then(() => console.log('Audio context resumed during initialization'))
+            .catch(err => console.error('Failed to resume audio context:', err));
+        }
       } catch (err) {
         console.error('Failed to create audio context:', err);
       }
@@ -108,16 +122,45 @@ export function AudioProvider({ children }) {
       if (!analyzerRef.current) {
         analyzerRef.current = audioContextRef.current.createAnalyser();
         analyzerRef.current.fftSize = 256;
+        analyzerRef.current.smoothingTimeConstant = 0.8; // Add smoothing for better visualization
       }
       
-      // Create media stream source if it doesn't exist
-      if (!mediaStreamSourceRef.current) {
+      // Handle media stream source connection
+      try {
+        // If we already have a media source, try to disconnect it first to avoid errors
+        if (mediaStreamSourceRef.current) {
+          try {
+            mediaStreamSourceRef.current.disconnect();
+            console.log('Disconnected existing media source');
+          } catch (disconnectErr) {
+            console.log('Media source might already be disconnected:', disconnectErr.message);
+          }
+        }
+        
+        // Create a new media stream source
         mediaStreamSourceRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+        console.log('Created new media element source');
+        
+        // Connect the media source to the analyzer and destination
         mediaStreamSourceRef.current.connect(analyzerRef.current);
         analyzerRef.current.connect(audioContextRef.current.destination);
+        console.log('Audio analyzer connected successfully');
+      } catch (sourceErr) {
+        // If we get an error about the element already being connected, that's actually okay
+        if (sourceErr.message && sourceErr.message.includes('already connected')) {
+          console.log('Audio element already connected to a node, which is fine');
+          
+          // Make sure analyzer is connected to destination
+          try {
+            analyzerRef.current.connect(audioContextRef.current.destination);
+          } catch (connectErr) {
+            // Ignore if already connected
+            console.log('Analyzer might already be connected to destination');
+          }
+        } else {
+          throw sourceErr; // Re-throw if it's a different error
+        }
       }
-      
-      console.log('Audio analyzer connected successfully');
     } catch (err) {
       console.error('Failed to connect analyzer:', err);
     }
@@ -235,28 +278,34 @@ export function AudioProvider({ children }) {
     }
     
     return () => {
-      // Clean up
+      // Only clean up resources, but don't close the global audio context
+      
+      // Disconnect media source if it exists
       if (mediaStreamSourceRef.current) {
         try {
           mediaStreamSourceRef.current.disconnect();
+          console.log('Media source disconnected during cleanup');
         } catch (e) {
           // Ignore disconnection errors
+          console.log('Error disconnecting media source:', e.message);
         }
       }
       
+      // Remove audio element from DOM
       if (audioElementRef.current && audioElementRef.current.parentNode) {
         audioElementRef.current.parentNode.removeChild(audioElementRef.current);
+        console.log('Audio element removed from DOM during cleanup');
       }
       
+      // Don't close the audio context since we're using a global singleton
+      // Just clear our reference to it
       if (audioContextRef.current) {
-        try {
-          audioContextRef.current.close();
-        } catch (e) {
-          // Ignore close errors
-        }
+        console.log('Clearing audio context reference during cleanup');
+        // We don't close the context, just clear our reference
+        audioContextRef.current = null;
       }
     };
-  }, [isIOS, tryOscillatorUnlock]);
+  }, [isIOS]);
 
   // Play audio using HTML5 Audio element
   const playAudioWithElement = useCallback((url, dialogueId, dialogue) => {
@@ -340,7 +389,7 @@ export function AudioProvider({ children }) {
             url: url,
             autostart: false,
             loop: false,
-            volume: -100, // Set volume to minimum since we're using HTML5 Audio for sound
+            volume: -20, // Increase from -100 to -20 to get better analyzer data while still keeping it quiet
             onload: () => {
               console.log('[iOS Hybrid] Tone.js player loaded successfully');
               setCurrentDialogue(dialogue);
@@ -490,43 +539,45 @@ export function AudioProvider({ children }) {
             if (silentAudio) {
               console.log('[iOS] Playing silent audio to unlock iOS audio');
               
-              // Clone the silent audio element to ensure it can be played again
-              const silentClone = silentAudio.cloneNode(true);
-              silentClone.onended = () => {
+              // Set up event handlers
+              const onEnded = () => {
                 console.log('[iOS] Silent audio ended, proceeding with actual audio');
-                document.body.removeChild(silentClone);
+                silentAudio.removeEventListener('ended', onEnded);
+                silentAudio.removeEventListener('error', onError);
                 resolve();
               };
               
-              silentClone.onerror = () => {
-                console.error('[iOS] Silent audio error, proceeding anyway');
-                if (silentClone.parentNode) {
-                  document.body.removeChild(silentClone);
-                }
+              const onError = (error) => {
+                console.error('[iOS] Silent audio error, proceeding anyway', error);
+                silentAudio.removeEventListener('ended', onEnded);
+                silentAudio.removeEventListener('error', onError);
                 resolve();
               };
               
-              // Add to DOM and play
-              document.body.appendChild(silentClone);
+              // Add event listeners
+              silentAudio.addEventListener('ended', onEnded);
+              silentAudio.addEventListener('error', onError);
               
-              silentClone.play()
+              // Reset the audio element to ensure it can be played again
+              silentAudio.currentTime = 0;
+              
+              // Play the audio
+              silentAudio.play()
                 .then(() => {
                   console.log('[iOS] Silent audio playing');
                 })
                 .catch(err => {
                   console.error('[iOS] Failed to play silent audio:', err);
-                  if (silentClone.parentNode) {
-                    document.body.removeChild(silentClone);
-                  }
+                  silentAudio.removeEventListener('ended', onEnded);
+                  silentAudio.removeEventListener('error', onError);
                   resolve(); // Continue anyway
                 });
               
               // Set a timeout in case onended doesn't fire
               setTimeout(() => {
                 console.log('[iOS] Silent audio timeout, proceeding anyway');
-                if (silentClone.parentNode) {
-                  document.body.removeChild(silentClone);
-                }
+                silentAudio.removeEventListener('ended', onEnded);
+                silentAudio.removeEventListener('error', onError);
                 resolve();
               }, 500);
             } else {
