@@ -27,7 +27,7 @@ function AppContent() {
           pointerEvents: 'none',
           background: 'rgba(0, 0, 0, 0.2)', // Semi-transparent background
         }}>
-          <div style={{ height: '400px' }}> {/* Removed width: 100% */}
+          <div style={{ height: '100px' }}> {/* Reduced height */}
             <AudioVisualizer />
           </div>
         </div>
