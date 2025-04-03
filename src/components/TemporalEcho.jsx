@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { fragmentTypes } from '../config/fragmentTypes'
 import useGameState from '../hooks/useGameState'
@@ -10,10 +10,12 @@ import styles from './TemporalEcho.module.scss'
 export default function TemporalEcho({ 
   id,
   type,
-  position
+  position,
+  appearance // Optional prop for specific visual styles like 'moon'
 }) {
   const [showPrompt, setShowPrompt] = useState(false)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  const [showCaption, setShowCaption] = useState(false) // State for temporary caption
   const { gameState } = useGameState()
   const { 
     isAnalyzing, 
@@ -28,13 +30,22 @@ export default function TemporalEcho({
   const handleClick = (e) => {
     e.preventDefault()
     if (!isCollected && (!isAnalyzing || currentFragment === id)) {
-      handleFragmentInteraction(id, type)
+      handleFragmentInteraction(id, type) // Keep existing interaction for now
+      
+      // Show caption temporarily
+      setShowCaption(true)
+      const timer = setTimeout(() => {
+        setShowCaption(false)
+      }, 3000) // Show for 3 seconds
+
+      // Cleanup timer on component unmount or if clicked again
+      return () => clearTimeout(timer)
     }
   }
 
   return (
     <motion.div 
-      className={`${styles.echo} ${isCollected ? styles.collected : ''}`}
+      className={`${styles.echo} ${isCollected ? styles.collected : ''} ${appearance === 'moon' ? styles.moon : ''}`}
       style={{ 
         left: `${position.x}%`, 
         top: `${position.y}%`,
@@ -99,6 +110,11 @@ export default function TemporalEcho({
           type={type}
           config={fragmentConfig}
         />
+      )}
+
+      {/* Temporary Caption */}
+      {showCaption && appearance === 'moon' && (
+        <div className={styles.caption}>Moon</div>
       )}
     </motion.div>
   )

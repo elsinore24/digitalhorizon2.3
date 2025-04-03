@@ -50,6 +50,35 @@
   }
 }
 
+/* Styles for Moon Appearance */
+.moon {
+  .core {
+    background: radial-gradient(circle, #e0e0e0 20%, #a0a0a0 80%); // Grey gradient for moon
+    box-shadow: 0 0 15px #ffffff; // White glow
+    .icon {
+      display: none; // Hide default icon
+    }
+  }
+  .rings {
+    display: none; // Hide rings for moon
+  }
+}
+
+/* Styles for Temporary Caption */
+.caption {
+  position: absolute;
+  bottom: 110%; // Position above the echo
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none; // Prevent caption from interfering with clicks
+}
+
 .collected {
   opacity: 0.5;
   cursor: default;

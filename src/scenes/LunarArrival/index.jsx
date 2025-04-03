@@ -64,6 +64,7 @@ const LunarArrival = ({ dataPerceptionMode }) => {
                   id="research_001"
                   type="RESEARCH_LOG"
                   position={{ x: 25, y: 40 }}
+                  appearance="moon" // Add appearance prop for moon styling
                 />
                 <TemporalEcho 
                   id="memory_001"
