@@ -80,7 +80,7 @@ export default function AudioVisualizer() {
               const normalizedDb = Math.max(0, Math.min(1, (analyzerData[i] + 100) / 100));
               // Scale the normalized value more aggressively to utilize more of the 0-255 range
               // Experiment with the multiplier (e.g., 1.5) to adjust sensitivity
-              dataArray[i] = Math.min(255, Math.floor(normalizedDb * 255 * 1.5));
+              dataArray[i] = Math.floor(normalizedDb * 255);
             }
             
             useRealData = true
