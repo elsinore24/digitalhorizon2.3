@@ -63,27 +63,28 @@ export default function AudioVisualizer() {
           useRealData = true;
           console.log('Using REAL audio data from Web Audio API analyzer', tempArray.slice(0, 5));
         } else {
-          // Fall back to getAnalyzerData which might use Tone.js
+          // Fall back to getAnalyzerData which might use Tone.js (iOS path)
           const analyzerData = getAnalyzerData()
-          console.log('getAnalyzerData result:', analyzerData ? `array of length ${analyzerData.length}` : 'null/empty',
-                      analyzerData && analyzerData.length > 0 ? `first values: ${analyzerData.slice(0, 5)}` : '');
+          console.log('[iOS Path] getAnalyzerData result:', analyzerData ? `array of length ${analyzerData.length}` : 'null/empty',
+                      analyzerData && analyzerData.length > 0 ? `raw dB values: ${analyzerData.slice(0, 5)}` : '');
           
           // Check if we got valid data
-          if (analyzerData && analyzerData.length > 0) {
+          if (analyzerData && analyzerData.length > 0 && analyzerData.some(v => v > -Infinity)) { // Check for actual values
             // Convert to 0-255 range needed for visualization
             dataArray = new Uint8Array(analyzerData.length)
             
             // Convert from dB (-100 to 0 range) to 0-255 range for visualization
             for (let i = 0; i < analyzerData.length; i++) {
-              // Tone.js FFT analyzer returns values in dB from -100 to 0
-              // Map -100..0 to 0..255
-              dataArray[i] = Math.max(0, Math.min(255,
-                Math.floor(((analyzerData[i] + 100) / 100) * 255)
-              ))
+              // Tone.js FFT analyzer returns values in dB from -Infinity to 0
+              // Map -100..0 to 0..255 (adjusting range slightly)
+              const normalizedDb = Math.max(0, Math.min(1, (analyzerData[i] + 100) / 100)); // Normalize -100dB to 0dB -> 0 to 1
+              dataArray[i] = Math.floor(normalizedDb * 255);
             }
             
             useRealData = true
-            console.log('Using REAL audio data from Tone.js analyzer', dataArray.slice(0, 5));
+            console.log('[iOS Path] Using REAL audio data from Tone.js analyzer. Converted 0-255 values:', dataArray.slice(0, 5));
+          } else {
+             console.log('[iOS Path] No valid data from getAnalyzerData, will use simulated.');
           }
         }
       } catch (err) {
