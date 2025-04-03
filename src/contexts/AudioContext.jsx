@@ -23,6 +23,7 @@ export function AudioProvider({ children }) {
   const audioElementRef = useRef(null)
   const analyzerRef = useRef(null)
   const mediaStreamSourceRef = useRef(null)
+  const masterGainNodeRef = useRef(null); // Add ref for master gain
   const [audioInitialized, setAudioInitialized] = useState(false)
   
   // Check if we're on iOS
@@ -86,11 +87,28 @@ export function AudioProvider({ children }) {
         // Use the global audio context
         audioContextRef.current = window.globalAudioContext;
         console.log('Using global audio context');
-        
+
+        // Create and connect Master Gain Node if it doesn't exist
+        if (audioContextRef.current && !masterGainNodeRef.current) {
+          masterGainNodeRef.current = audioContextRef.current.createGain();
+          masterGainNodeRef.current.gain.value = isMuted ? 0 : 1; // Set initial gain based on state
+          masterGainNodeRef.current.connect(audioContextRef.current.destination);
+          console.log('Master Gain Node created and connected during init.');
+        }
+
         // Resume the context if it's suspended
         if (audioContextRef.current.state === 'suspended') {
           audioContextRef.current.resume()
-            .then(() => console.log('Audio context resumed during initialization'))
+            .then(() => {
+               console.log('Audio context resumed during initialization');
+               // Ensure gain node exists after resume as well
+               if (audioContextRef.current && !masterGainNodeRef.current) {
+                 masterGainNodeRef.current = audioContextRef.current.createGain();
+                 masterGainNodeRef.current.gain.value = isMuted ? 0 : 1;
+                 masterGainNodeRef.current.connect(audioContextRef.current.destination);
+                 console.log('Master Gain Node created post-resume.');
+               }
+            })
             .catch(err => console.error('Failed to resume audio context:', err));
         }
       } catch (err) {
@@ -144,7 +162,7 @@ export function AudioProvider({ children }) {
         
         // Connect the media source to the analyzer and destination
         mediaStreamSourceRef.current.connect(analyzerRef.current);
-        analyzerRef.current.connect(audioContextRef.current.destination);
+        analyzerRef.current.connect(masterGainNodeRef.current); // Connect analyzer to gain node
         console.log('Audio analyzer connected successfully');
       } catch (sourceErr) {
         // If we get an error about the element already being connected, that's actually okay
@@ -153,7 +171,7 @@ export function AudioProvider({ children }) {
           
           // Make sure analyzer is connected to destination
           try {
-            analyzerRef.current.connect(audioContextRef.current.destination);
+            analyzerRef.current.connect(masterGainNodeRef.current); // Connect analyzer to gain node
           } catch (connectErr) {
             // Ignore if already connected
             console.log('Analyzer might already be connected to destination');
@@ -407,7 +425,7 @@ export function AudioProvider({ children }) {
             
             // Connect source -> analyzer -> destination
             iosSourceNode.connect(analyzerRef.current);
-            analyzerRef.current.connect(audioContextRef.current.destination);
+            analyzerRef.current.connect(masterGainNodeRef.current); // Connect analyzer to gain node
             console.log('[iOS Web Audio] Connected iosAudioElement to analyzer');
             
           } catch (sourceErr) {
@@ -416,7 +434,7 @@ export function AudioProvider({ children }) {
                console.log('[iOS Web Audio] iosAudioElement already connected to a node.');
                // Ensure analyzer is connected to destination anyway
                try {
-                 analyzerRef.current.connect(audioContextRef.current.destination);
+                 analyzerRef.current.connect(masterGainNodeRef.current); // Connect analyzer to gain node
                } catch (connectErr) { /* Ignore */ }
              } else {
                throw sourceErr; // Re-throw other errors
@@ -426,9 +444,7 @@ export function AudioProvider({ children }) {
           // Set current dialogue info
           setCurrentDialogue(dialogue);
 
-          // Set initial mute state based on context
-          iosAudioElement.muted = isMuted;
-          console.log(`[iOS Web Audio] Initial mute state set to: ${isMuted}`);
+          // Initial mute state is handled by the masterGainNodeRef, no need to set on element
 
           // Start HTML5 Audio playback
           console.log('[iOS Web Audio] Starting HTML5 Audio playback');
@@ -611,20 +627,23 @@ export function AudioProvider({ children }) {
   const toggleMute = useCallback(() => {
     setIsMuted(prevMuted => {
       const newMuted = !prevMuted;
-      // Mute/unmute the primary audio element used for playback/analysis
-      if (audioElementRef.current) {
-        audioElementRef.current.muted = newMuted;
-        console.log(`Persistent audio element muted: ${newMuted}`);
+      // Control mute via the Master Gain Node
+      if (masterGainNodeRef.current && audioContextRef.current) {
+        // Use setValueAtTime and linearRampToValueAtTime for smooth transition
+        const now = audioContextRef.current.currentTime;
+        masterGainNodeRef.current.gain.cancelScheduledValues(now); // Cancel any previous ramps
+        masterGainNodeRef.current.gain.setValueAtTime(masterGainNodeRef.current.gain.value, now); // Start from current value
+        masterGainNodeRef.current.gain.linearRampToValueAtTime(
+          newMuted ? 0 : 1, // Target value (0 for mute, 1 for unmute)
+          now + 0.05 // Ramp duration (e.g., 50ms)
+        );
+        console.log(`Master gain node ramp initiated to ${newMuted ? 0 : 1}`);
+      } else {
+        console.warn('Master Gain Node or Audio Context not available for toggleMute.');
       }
-      // Also mute/unmute the currently active audio instance (could be the temporary iOS one)
-      if (audioRef.current) {
-        audioRef.current.muted = newMuted;
-        console.log(`Active audioRef element muted: ${newMuted}`);
-      }
-      // Note: If global Tone mute is needed: Tone.Destination.mute = newMuted;
       return newMuted;
     });
-  }, []); // No dependencies needed as it only uses refs and setIsMuted
+  }, []); // Dependencies: isMuted state is implicitly handled by setIsMuted setter. Refs don't need to be deps.
 
 
   return (
