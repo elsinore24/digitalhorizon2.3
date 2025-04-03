@@ -6,14 +6,14 @@ export const destinations = [
     name: 'Moon',
     caption: 'Moon',
     visualStyle: 'moon', // CSS class identifier
-    position: { x: 35, y: 95 }, // Moved right, Inverted Y for distance
+    position: { x: 35, y: 60 }, // Moved higher
     color: '#c0c0c0', // Silver grey
     motion: null // No special motion
   },
   {
     id: 'dest_mars_compound', // Updated ID for clarity
     name: 'Mars System', // Updated name
-    position: { x: 80, y: 85 }, // Position for Mars (parent) - Moved right, Inverted Y
+    position: { x: 80, y: 50 }, // Moved higher
     parentBody: { // Mars Planet
       visualStyle: 'planet_mars',
       size: 60, // Example size
@@ -34,7 +34,7 @@ export const destinations = [
     name: 'Deep Space Satellite',
     caption: 'Satellite',
     visualStyle: 'satellite',
-    position: { x: 50, y: 70 }, // Inverted Y for distance
+    position: { x: 50, y: 55 }, // Moved higher
     color: '#add8e6', // Light blue / metallic
     motion: { type: 'pulse', speed: 0.5 } // Example: slow pulse
   },
