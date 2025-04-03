@@ -7,32 +7,16 @@ import styles from './DialogueSystem.module.scss'
 const DialogueSystem = () => {
   const { currentDialogue, isPlaying, currentTrack } = useAudio();
   const { gameState } = useGameState(); // Get game state
-  const [displayedText, setDisplayedText] = useState('')
-  const [typingComplete, setTypingComplete] = useState(false)
+  const [displayedText, setDisplayedText] = useState('');
   
+  // Effect to handle instant text display
   useEffect(() => {
-    console.log('Current audio state:', { currentDialogue, isPlaying, currentTrack })
-    
     if (currentDialogue) {
-      setDisplayedText('')
-      setTypingComplete(false)
-      
-      const fullText = currentDialogue.text
-      let charIndex = 0
-      
-      const typingInterval = setInterval(() => {
-        if (charIndex < fullText.length) {
-          setDisplayedText(fullText.substring(0, charIndex + 1))
-          charIndex++
-        } else {
-          clearInterval(typingInterval)
-          setTypingComplete(true)
-        }
-      }, 30)
-      
-      return () => clearInterval(typingInterval)
+      setDisplayedText(currentDialogue.text); // Set full text instantly
+    } else {
+      setDisplayedText(''); // Clear text if no dialogue
     }
-  }, [currentDialogue])
+  }, [currentDialogue]); // Rerun effect when dialogue changes
   
   if (!currentDialogue) return null
 
@@ -52,7 +36,6 @@ const DialogueSystem = () => {
         </div>
         <div className={styles.dialogueText}>
           {displayedText}
-          {!typingComplete && <span className={styles.cursor}>_</span>}
         </div>
       </div>
     </div>

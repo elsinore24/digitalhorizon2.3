@@ -49,14 +49,11 @@
   letter-spacing: 0.5px;
   position: relative;
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
-
-  &::after {
-    content: '_';
-    animation: blink 1s infinite;
-  }
+  opacity: 0; // Initially hidden for fade-in
+  transition: opacity 0.5s ease-in-out; // Fade transition
 }
 
-@keyframes blink {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
+// Class to make the text visible (triggers transition)
+.visible {
+  opacity: 1;
 }
