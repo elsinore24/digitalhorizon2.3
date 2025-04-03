@@ -49,9 +49,9 @@ export default function Scene3D({ dataPerceptionMode }) {
     const renderScene = new RenderPass(sceneRef.current, cameraRef.current);
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.7, // strength
-      0.3, // radius
-      0.8  // threshold
+      1.0, // strength (Increased from 0.7)
+      0.3, // radius (Kept the same)
+      0.4  // threshold (Decreased from 0.8)
     );
     const composer = new EffectComposer(rendererRef.current); // Use rendererRef.current
     composer.addPass(renderScene);
@@ -127,10 +127,13 @@ export default function Scene3D({ dataPerceptionMode }) {
     backgroundElementsRef.current.stars = stars;
     starsRef.current = stars; // Store for rotation
 
-    // --- Create Nebula/Galaxy Planes (Placeholders) ---
-    // TODO: Replace with actual texture loading
+    // --- Create Nebula/Galaxy Planes ---
+    const textureLoader = new THREE.TextureLoader();
+    const nebulaTexture = textureLoader.load('/textures/nebula.jpg');
+    const galaxyTexture = textureLoader.load('/textures/galaxy_band.jpg');
+
     const nebulaMaterial = new THREE.MeshBasicMaterial({
-      color: 0xaa00ff, // Placeholder purple
+      map: nebulaTexture, // Use loaded nebula texture
       transparent: true,
       opacity: 0.15,
       side: THREE.DoubleSide,
@@ -144,8 +147,8 @@ export default function Scene3D({ dataPerceptionMode }) {
     sceneRef.current.add(nebulaPlane1);
     backgroundElementsRef.current.nebula1 = nebulaPlane1;
 
-    const galaxyMaterial = new THREE.MeshBasicMaterial({ // Uncommented galaxy
-      color: 0xffffff,
+    const galaxyMaterial = new THREE.MeshBasicMaterial({ // Use loaded galaxy texture
+      map: galaxyTexture,
       transparent: true,
       opacity: 0.1,
       side: THREE.DoubleSide,
