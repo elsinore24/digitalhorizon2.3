@@ -38,11 +38,7 @@ const LunarArrival = ({ dataPerceptionMode }) => {
         </button>
       ) : (
         <>
-          <div className={styles.lunarSurface}>
-            <div className={styles.stars} />
-            <div className={styles.horizon} />
-            <div className={styles.lunarGround} />
-          </div>
+          {/* Old background divs removed */}
 
           <Scene3D dataPerceptionMode={dataPerceptionMode} />
           <DataPerceptionOverlay active={dataPerceptionMode} />

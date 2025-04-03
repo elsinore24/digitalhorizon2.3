@@ -69,56 +69,7 @@
   }
 }
 
-.lunarSurface {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-}
-
-.stars {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background-image: 
-    radial-gradient(2px 2px at 20px 30px, #eee, rgba(0,0,0,0)),
-    radial-gradient(2px 2px at 40px 70px, #fff, rgba(0,0,0,0)),
-    radial-gradient(1px 1px at 90px 40px, #fff, rgba(0,0,0,0));
-  background-repeat: repeat;
-  animation: twinkle 4s infinite;
-  opacity: 0.8;
-}
-
-.horizon {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60%;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    rgba(50, 50, 50, 0.5) 40%,
-    rgb(30, 30, 30) 100%
-  );
-}
-
-.lunarGround {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 40%;
-  background: 
-    linear-gradient(
-      to bottom,
-      rgba(50, 50, 50, 0.8),
-      rgb(30, 30, 30)
-    );
-  box-shadow: 0 -20px 60px rgba(0,0,0,0.6);
-}
+/* Old background styles removed (.lunarSurface, .stars, .horizon, .lunarGround) */
 
 .dataElements {
   position: absolute;
