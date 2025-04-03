@@ -6,17 +6,17 @@ export const destinations = [
     name: 'Moon',
     caption: 'Moon',
     visualStyle: 'moon', // CSS class identifier
-    position: { x: 35, y: 60 }, // Moved higher
+    position: { x: 35, y: 85 }, // Moved closer (down more)
     color: '#c0c0c0', // Silver grey
     motion: null // No special motion
   },
   {
     id: 'dest_mars_compound', // Updated ID for clarity
     name: 'Mars System', // Updated name
-    position: { x: 80, y: 50 }, // Moved higher
+    position: { x: 80, y: 75 }, // Moved down towards bottom right
     parentBody: { // Mars Planet
       visualStyle: 'planet_mars',
-      size: 60, // Example size
+      size: 40, // Made smaller
       color: '#b22222', // Firebrick red for Mars
       caption: 'Mars'
     },
