@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import useAudio from '../hooks/useAudio'
 import styles from './DialogueDisplay.module.scss'
 
-export default function DialogueDisplay() {
+export default function DialogueDisplay({ isHidden }) { // Accept isHidden prop
   const { currentDialogue, isPlaying } = useAudio()
   const [displayText, setDisplayText] = useState('')
   
@@ -30,7 +30,10 @@ export default function DialogueDisplay() {
   if (!currentDialogue || !isPlaying) return null
   
   return (
-    <div className={styles.dialogueContainer}>
+    <div
+      className={styles.dialogueContainer}
+      style={{ display: isHidden ? 'none' : 'block' }} // Apply conditional display style
+    >
       <div className={styles.dialogueBox}>
         <div className={styles.dialogueHeader}>
           <div className={styles.speakerName}>
