@@ -14,7 +14,8 @@ export function AudioProvider({ children }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTrack, setCurrentTrack] = useState(null)
   const [currentDialogue, setCurrentDialogue] = useState(null)
-  const audioRef = useRef(null)
+  const audioRef = useRef(null) // Refers to Tone.Player or HTML5 element depending on context
+  const [isMuted, setIsMuted] = useState(false) // Add mute state
   const [isIOS, setIsIOS] = useState(false)
 
   // Audio-related refs
@@ -602,6 +603,23 @@ export function AudioProvider({ children }) {
     setCurrentDialogue(null);
   }, []);
 
+  // Function to toggle mute state
+  const toggleMute = useCallback(() => {
+    setIsMuted(prevMuted => {
+      const newMuted = !prevMuted;
+      // Mute/unmute the primary audio element used for playback/analysis
+      if (audioElementRef.current) {
+        audioElementRef.current.muted = newMuted;
+        console.log(`Audio element muted: ${newMuted}`);
+      }
+      // Note: This might not mute sounds played *only* through Tone.js if any exist,
+      // but narration seems routed via audioElementRef.
+      // If global Tone mute is needed: Tone.Destination.mute = newMuted;
+      return newMuted;
+    });
+  }, []); // No dependencies needed as it only uses refs and setIsMuted
+
+
   return (
     <AudioContext.Provider value={{
       playNarration,
@@ -613,7 +631,9 @@ export function AudioProvider({ children }) {
       currentTrack,
       currentDialogue,
       isIOS,
-      analyzer: analyzerRef.current
+      analyzer: analyzerRef.current,
+      isMuted, // Expose mute state
+      toggleMute // Expose toggle function
     }}>
       {children}
     </AudioContext.Provider>

@@ -1,121 +1,130 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { fragmentTypes } from '../config/fragmentTypes'
-import useGameState from '../hooks/useGameState'
-import InteractionPrompt from './InteractionPrompt'
-import FragmentAnalyzer from './FragmentAnalyzer'
-import useFragmentCollection from '../hooks/useFragmentCollection'
+// Removed unused imports: useEffect, fragmentTypes, useGameState, InteractionPrompt, FragmentAnalyzer, useFragmentCollection
 import styles from './TemporalEcho.module.scss'
 
-export default function TemporalEcho({ 
-  id,
-  type,
-  position,
-  appearance // Optional prop for specific visual styles like 'moon'
+export default function TemporalEcho({
+  id, // Keep id for key prop in parent mapping
+  destinationConfig // Pass the rest of the config object
 }) {
-  const [showPrompt, setShowPrompt] = useState(false)
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  // Destructure config properties
+  const {
+    position,
+    visualStyle, // Used for simple destinations
+    color,       // Used for simple destinations
+    caption,     // Used for simple destinations
+    motion: motionConfig, // Used for simple destinations (or potentially parent)
+    parentBody,  // Config for the main body (e.g., Mars planet)
+    childBody    // Config for the orbiting body (e.g., outpost)
+  } = destinationConfig;
+
+  // Determine if this is a compound destination
+  const isCompound = !!parentBody;
   const [showCaption, setShowCaption] = useState(false) // State for temporary caption
-  const { gameState } = useGameState()
-  const { 
-    isAnalyzing, 
-    currentFragment, 
-    handleFragmentInteraction
-  } = useFragmentCollection()
+  // Removed unused state and hooks: showPrompt, mousePos, gameState, useFragmentCollection related state/functions
+  // Removed config derived from fragmentTypes
 
-  const fragmentConfig = fragmentTypes[type]
-  const isCurrentlyAnalyzing = isAnalyzing && currentFragment === id
-  const isCollected = gameState.discoveredEchoes?.includes(id)
+  // Store the caption text to display
+  const [captionToShow, setCaptionToShow] = useState('');
 
-  const handleClick = (e) => {
-    e.preventDefault()
-    if (!isCollected && (!isAnalyzing || currentFragment === id)) {
-      handleFragmentInteraction(id, type) // Keep existing interaction for now
-      
-      // Show caption temporarily
-      setShowCaption(true)
-      const timer = setTimeout(() => {
-        setShowCaption(false)
-      }, 3000) // Show for 3 seconds
+  const handleClick = (e, captionText) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevent potential nested clicks if needed later
 
-      // Cleanup timer on component unmount or if clicked again
-      return () => clearTimeout(timer)
-    }
-  }
+    setCaptionToShow(captionText); // Set the specific caption
+    setShowCaption(true);
+    const timer = setTimeout(() => {
+      setShowCaption(false);
+      setCaptionToShow(''); // Clear caption text
+    }, 3000); // Show for 3 seconds
 
-  return (
-    <motion.div 
-      className={`${styles.echo} ${isCollected ? styles.collected : ''} ${appearance === 'moon' ? styles.moon : ''}`}
-      style={{ 
-        left: `${position.x}%`, 
-        top: `${position.y}%`,
-        '--echo-color': fragmentConfig.color,
-        '--echo-glow': fragmentConfig.glowColor
-      }}
-      animate={
-        isCurrentlyAnalyzing 
-          ? {
-              scale: [1, 1.2, 1],
-              opacity: [0.7, 1, 0.7]
-            }
-          : {
-              scale: 1,
-              opacity: isCollected ? 0.5 : 1
-            }
-      }
-      transition={{
-        duration: 2,
-        repeat: isCurrentlyAnalyzing ? Infinity : 0,
-        ease: "easeInOut"
-      }}
-      onMouseEnter={(e) => {
-        if (!isCollected) {
-          setShowPrompt(true)
-          setMousePos({ x: e.clientX, y: e.clientY })
-        }
-      }}
-      onMouseLeave={() => setShowPrompt(false)}
-      onClick={handleClick}
-    >
-      <div className={styles.core}>
-        <span className={styles.icon}>{fragmentConfig.icon}</span>
+    return () => clearTimeout(timer);
+  };
+
+  // Common style for the main container div
+  const containerStyle = {
+    left: `${position.x}%`,
+    top: `${position.y}%`,
+  };
+
+  // --- Render Logic ---
+  if (isCompound) {
+    // Render Compound Destination (e.g., Mars + Outpost)
+    const parentStyle = {
+      '--echo-color': parentBody.color || '#fff',
+      width: `${parentBody.size || 40}px`, // Use size from config
+      height: `${parentBody.size || 40}px`,
+    };
+    const childStyle = {
+      '--echo-color': childBody.color || '#fff',
+      width: `${childBody.size || 15}px`,
+      height: `${childBody.size || 15}px`,
+    };
+    const orbitDuration = childBody.motion?.type === 'orbit' ? `${childBody.motion.speed || 5}s` : '5s';
+
+    return (
+      <div
+        className={`${styles.echo} ${styles.compoundContainer}`} // Base + compound marker
+        style={containerStyle}
+        // Prevent clicks on the container from triggering caption if parent/child have handlers
+      >
+        {/* Parent Body (e.g., Mars) */}
+        <motion.div
+          className={`${styles.parentBody} ${styles[parentBody.visualStyle] || ''}`}
+          style={parentStyle}
+          onClick={(e) => handleClick(e, parentBody.caption)}
+          // Add motion config for parent if needed later
+        >
+          {/* Core visual element for parent, styled by CSS */}
+           <div className={styles.core}></div>
+        </motion.div>
+
+        {/* Child Body Wrapper (for orbit animation) */}
+        {childBody && (
+          <div
+            className={styles.childWrapper}
+            style={{ animation: `${styles.orbit} ${orbitDuration} linear infinite` }}
+          >
+            <motion.div
+              className={`${styles.childBody} ${styles[childBody.visualStyle] || ''}`}
+              style={childStyle}
+              // onClick={(e) => handleClick(e, childBody.caption)} // Optional: click handler for child
+            >
+               {/* Core visual element for child, styled by CSS */}
+               <div className={styles.core}></div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Caption Display (Positioned relative to the main container) */}
+        {showCaption && (
+          <div className={styles.caption}>{captionToShow}</div>
+        )}
       </div>
-      <motion.div 
-        className={styles.rings}
-        animate={{
-          scale: [1, 1.2, 1],
-          opacity: [0.8, 0.3, 0.8]
-        }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      />
-      
-      {showPrompt && !isCollected && !isAnalyzing && (
-        <InteractionPrompt 
-          show={true}
-          type={type.toLowerCase()}
-          position={mousePos}
-          description={fragmentConfig.description}
-          icon={fragmentConfig.icon}
-        />
-      )}
+    );
 
-      {isCurrentlyAnalyzing && (
-        <FragmentAnalyzer 
-          isAnalyzing={true}
-          fragmentId={id}
-          type={type}
-          config={fragmentConfig}
-        />
-      )}
+  } else {
+    // Render Simple Destination (e.g., Moon, Satellite)
+    const simpleStyle = {
+      '--echo-color': color || '#fff',
+    };
 
-      {/* Temporary Caption */}
-      {showCaption && appearance === 'moon' && (
-        <div className={styles.caption}>Moon</div>
-      )}
-    </motion.div>
-  )
+    return (
+      <motion.div
+        className={`${styles.echo} ${styles[visualStyle] || ''}`} // Base + specific style
+        style={{ ...containerStyle, ...simpleStyle }}
+        onClick={(e) => handleClick(e, caption)}
+        // TODO: Implement animations based on motionConfig if needed
+      >
+        {/* Core visual element, styled by CSS */}
+        <div className={styles.core}></div>
+
+        {/* Caption Display */}
+        {showCaption && (
+          <div className={styles.caption}>{captionToShow}</div>
+        )}
+      </motion.div>
+    );
+  }
+  // Removed stray closing parenthesis
 }

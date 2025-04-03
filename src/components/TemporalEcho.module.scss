@@ -64,6 +64,66 @@
   }
 }
 
+/* Styles for Mars Outpost */
+.outpost {
+  .core {
+    border-radius: 0; // Square
+    background: var(--echo-color);
+    box-shadow: 0 0 15px var(--echo-color);
+  }
+  .rings { display: none; } // Hide rings for simplicity
+}
+
+/* Styles for Satellite */
+.satellite {
+  .core {
+    border-radius: 0;
+    transform: translate(-50%, -50%) rotate(45deg); // Diamond
+    background: var(--echo-color);
+    box-shadow: 0 0 15px var(--echo-color);
+  }
+  .rings { display: none; }
+}
+
+/* Styles for Alien Outpost */
+.alien_outpost {
+  .core {
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 20px solid var(--echo-color); // Triangle
+    background: transparent;
+    border-radius: 0;
+    box-shadow: 0 5px 15px var(--echo-color);
+  }
+  .rings { display: none; }
+}
+
+/* Styles for Alien Planet */
+.alien_planet {
+  .core {
+    // Keep circle, maybe add texture later
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 20%, var(--echo-color) 80%); // Use semi-transparent white instead of lighten()
+    box-shadow: 0 0 20px var(--echo-color);
+  }
+  .rings { display: none; }
+}
+
+/* Styles for Mega Structure */
+.mega_structure {
+  .core {
+     // Basic star shape using clip-path
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    background: var(--echo-color);
+    width: 25px; // Adjust size for clip-path
+    height: 25px;
+    border-radius: 0;
+    box-shadow: 0 0 25px var(--echo-color);
+  }
+  .rings { display: none; }
+}
+
 /* Styles for Temporary Caption */
 .caption {
   position: absolute;
@@ -85,6 +145,96 @@
   
   .rings {
     animation: none;
+  }
+}
+
+/* --- Styles for Compound Destinations --- */
+
+.compoundContainer {
+  // Adjust base echo styles if needed for compound container
+  // e.g., ensure pointer-events allow clicks on children if necessary
+  pointer-events: none; // Container itself isn't clickable
+  width: auto; // Let size be determined by parent
+  height: auto;
+}
+
+.parentBody {
+  position: relative; // Children positioned relative to this
+  pointer-events: all; // Parent is clickable
+  cursor: pointer;
+  display: flex; // Use flex to center core easily
+  align-items: center;
+  justify-content: center;
+  // Size and other styles set inline based on config
+  .core {
+    position: static; // Core is part of the parent flow now
+    transform: none; // No translation needed
+    left: auto;
+    top: auto;
+    width: 100%; // Core takes full size of parent
+    height: 100%;
+  }
+}
+
+.childWrapper {
+  position: absolute;
+  top: 0; // Position relative to parent's top-left
+  left: 0;
+  width: 100%; // Wrapper covers parent area for orbit reference
+  height: 100%;
+  pointer-events: none; // Wrapper isn't clickable
+  // Orbit animation applied inline via style prop
+}
+
+.childBody {
+  position: absolute;
+  top: 0; // Initial position for animation (top center)
+  left: 50%;
+  transform-origin: center center; // Orbit around the center
+  pointer-events: all; // Child can be clickable if needed later
+  cursor: pointer; // Indicate clickability if handler added later
+  display: flex; // Center core
+  align-items: center;
+  justify-content: center;
+   // Size and other styles set inline based on config
+  .core {
+    position: static;
+    transform: none;
+    left: auto;
+    top: auto;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+/* Specific visual styles for compound parts */
+.planet_mars {
+  .core {
+    background: var(--echo-color); // Use color from config
+    border-radius: 50%;
+    box-shadow: 0 0 20px var(--echo-color);
+  }
+}
+
+.orbiting_outpost {
+   .core {
+    background: var(--echo-color); // Use color from config
+    border-radius: 0; // Square/blocky
+    box-shadow: 0 0 10px var(--echo-color);
+  }
+}
+
+
+/* --- Keyframes --- */
+
+@keyframes orbit {
+  from {
+    // Start at top-center relative to parent, move out slightly
+    transform: translate(-50%, -70%) rotate(0deg) translateX(50px) rotate(0deg);
+  }
+  to {
+     // End at same position after full rotation
+    transform: translate(-50%, -70%) rotate(360deg) translateX(50px) rotate(-360deg);
   }
 }
 

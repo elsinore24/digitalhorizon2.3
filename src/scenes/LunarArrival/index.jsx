@@ -6,6 +6,7 @@ import Scene3D from '../../components/Scene3D'
 import DataPerceptionOverlay from '../../components/DataPerceptionOverlay'
 import ObjectiveTracker from '../../components/ObjectiveTracker'
 import DialogueSystem from '../../components/DialogueSystem'
+import { destinations } from '../../config/destinations' // Import the new config
 import styles from './LunarArrival.module.scss'
 
 const LunarArrival = ({ dataPerceptionMode }) => {
@@ -46,36 +47,19 @@ const LunarArrival = ({ dataPerceptionMode }) => {
           <Scene3D dataPerceptionMode={dataPerceptionMode} />
           <DataPerceptionOverlay active={dataPerceptionMode} />
           
-          {dataPerceptionMode && (
-            <ObjectiveTracker 
-              objective="DR. KAI'S RESEARCH FRGM"
-              progress={{
-                RESEARCH_LOG: gameState.discoveredEchoes?.filter(id => id.startsWith('research_')).length || 0,
-                PERSONAL_MEMORY: gameState.discoveredEchoes?.filter(id => id.startsWith('memory_')).length || 0,
-                ANOMALY: gameState.discoveredEchoes?.filter(id => id.startsWith('anomaly_')).length || 0
-              }}
-            />
-          )}
+          {/* Removed ObjectiveTracker as it's tied to old fragment system */}
           
           <div className={styles.environment}>
             {dataPerceptionMode && (
               <div className={styles.dataElements}>
-                <TemporalEcho 
-                  id="research_001"
-                  type="RESEARCH_LOG"
-                  position={{ x: 25, y: 40 }}
-                  appearance="moon" // Add appearance prop for moon styling
-                />
-                <TemporalEcho 
-                  id="memory_001"
-                  type="PERSONAL_MEMORY"
-                  position={{ x: 75, y: 60 }}
-                />
-                <TemporalEcho 
-                  id="anomaly_001"
-                  type="ANOMALY"
-                  position={{ x: 50, y: 30 }}
-                />
+                {/* Map over destinations config to render TemporalEcho components */}
+                {destinations.map((dest) => (
+                  <TemporalEcho
+                    key={dest.id}
+                    id={dest.id} // Pass id for potential future use, key is essential
+                    destinationConfig={dest} // Pass the whole config object
+                  />
+                ))}
               </div>
             )}
           </div>

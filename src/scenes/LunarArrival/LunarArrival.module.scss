@@ -7,6 +7,27 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  // Add pseudo-elements for window frame effect
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 15px; // Adjust inset for frame thickness/position
+    border-radius: 30px; // Adjust for desired curve
+    pointer-events: none; // Don't block clicks
+    z-index: 1; // Position above background but below UI elements
+  }
+
+  // Outer glow/edge
+  &::before {
+    box-shadow: 0 0 15px 5px rgba(0, 255, 255, 0.2); // Outer cyan glow
+  }
+
+  // Inner border/shadow
+  &::after {
+     box-shadow: inset 0 0 10px 2px rgba(0, 0, 0, 0.6); // Subtle inner shadow
+     border: 1px solid rgba(0, 255, 255, 0.15); // Faint inner border
+  }
 }
 
 .enterButton {

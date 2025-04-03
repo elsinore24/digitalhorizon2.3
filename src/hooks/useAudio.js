@@ -21,6 +21,13 @@ export default function useAudio() {
     }
     return null
   }, [context])
+
+  // Wrap toggleMute for stable reference (though context itself changes rarely)
+  const toggleMute = useCallback(() => {
+    if (context && context.toggleMute) {
+      context.toggleMute();
+    }
+  }, [context]);
   
   const getAnalyzerData = useCallback(() => {
     if (context && context.getAnalyzerData) {
@@ -37,6 +44,8 @@ export default function useAudio() {
     playNarration,
     getAudioInstance,
     getAnalyzerData,
-    analyzer: context ? context.analyzer : null
+    analyzer: context ? context.analyzer : null,
+    isMuted: context ? context.isMuted : false, // Add isMuted state
+    toggleMute // Add toggleMute function
   }
 }

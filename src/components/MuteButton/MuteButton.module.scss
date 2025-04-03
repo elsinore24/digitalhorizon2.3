@@ -1,0 +1,34 @@
+.muteButton {
+  position: fixed; // Position relative to the viewport
+  bottom: 20px;    // Distance from bottom
+  left: 20px;      // Distance from left
+  z-index: 1000;   // Ensure it's above most other elements
+
+  background-color: rgba(0, 0, 0, 0.5); // Semi-transparent background
+  color: #00ffff; // Cyan color to match UI theme
+  border: 1px solid #00ffff;
+  border-radius: 50%; // Make it circular
+  width: 40px;
+  height: 40px;
+  padding: 0; // Remove default padding
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+
+  &:hover {
+    background-color: rgba(0, 255, 255, 0.2); // Lighter background on hover
+  }
+
+  &:active {
+    transform: scale(0.95); // Slight shrink on click
+  }
+
+  // Style the SVG icon inside
+  svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor; // Use the button's color for the icon stroke
+  }
+}
