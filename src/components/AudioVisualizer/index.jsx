@@ -95,34 +95,31 @@ export default function AudioVisualizer() {
       }
       
       // If we couldn't get valid analyzer data, create dummy data
-      /*
       if (!useRealData) {
-        console.log('Using SIMULATED audio data for visualization (TEMP DISABLED)')
+        console.log('Using SIMULATED audio data for visualization')
         // Create dummy data for visualization that animates with time
-        // dataArray = new Uint8Array(128) // Ensure dataArray is initialized if needed elsewhere
-        // for (let i = 0; i < dataArray.length; i++) {
-        //   const position = i / dataArray.length
-        //   const centerEffect = 1 - Math.abs((position * 2) - 1) // Higher in middle
-        //   const time = Date.now() / 1000
-        //
-        //   // Make animation more dramatic for better visual effect
-        //   const animatedValue = Math.sin(position * 10 + time) * 30 + // Increased amplitude from 20 to 30
-        //                       Math.sin(position * 5 + time * 0.7) * 20 + // Increased from 15 to 20
-        //                       Math.sin(position * 20 + time * 1.3) * 15 // Increased from 10 to 15
-        //
-        //   // Base value plus centered effect plus animation
-        //   dataArray[i] = Math.min(255, Math.max(0,
-        //     Math.floor(isPlaying ?
-        //       (110 + (centerEffect * 120) + animatedValue) : // Increased base values and center effect
-        //       40 + (Math.sin(time) * 5)) // Subtle animation when not playing
-        //   ))
-        // }
+        dataArray = new Uint8Array(128) // Ensure dataArray is initialized if needed elsewhere
+        for (let i = 0; i < dataArray.length; i++) {
+          const position = i / dataArray.length
+          const centerEffect = 1 - Math.abs((position * 2) - 1) // Higher in middle
+          const time = Date.now() / 1000
+          
+          // Make animation more dramatic for better visual effect
+          const animatedValue = Math.sin(position * 10 + time) * 30 + // Increased amplitude from 20 to 30
+                              Math.sin(position * 5 + time * 0.7) * 20 + // Increased from 15 to 20
+                              Math.sin(position * 20 + time * 1.3) * 15 // Increased from 10 to 15
+          
+          // Base value plus centered effect plus animation
+          dataArray[i] = Math.min(255, Math.max(0,
+            Math.floor(isPlaying ?
+              (110 + (centerEffect * 120) + animatedValue) : // Increased base values and center effect
+              40 + (Math.sin(time) * 5)) // Subtle animation when not playing
+          ))
+        }
       }
-      */
-      // Ensure dataArray is at least an empty array if no real data was obtained
-      if (!useRealData) {
-          dataArray = new Uint8Array(0); // Use empty array if no real data
-          console.log('No real data, visualizer will be flat.');
+      // Ensure dataArray is defined even if simulation fails (shouldn't happen)
+      if (!dataArray) {
+          dataArray = new Uint8Array(0);
       }
       
       // Draw the bars

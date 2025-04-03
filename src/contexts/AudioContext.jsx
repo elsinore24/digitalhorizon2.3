@@ -377,133 +377,117 @@ export function AudioProvider({ children }) {
       }
       
       // Wait for user interaction to ensure Tone.js context is running
-      const startTone = async () => {
+      // Renamed from startTone as we no longer primarily use Tone here for iOS analysis
+      const startPlaybackAndAnalysis = async () => {
+        let iosSourceNode = null; // To store the source node for cleanup
+
         try {
-          // Ensure Tone.js context is running
-          await Tone.start();
-          console.log('[iOS Hybrid] Tone.js context started successfully');
+          // Ensure AudioContext is running (Tone.start() also resumes the underlying context)
+          if (audioContextRef.current && audioContextRef.current.state !== 'running') {
+             await audioContextRef.current.resume();
+             console.log('[iOS Web Audio] AudioContext resumed successfully');
+          } else if (!audioContextRef.current) {
+             console.error('[iOS Web Audio] AudioContext not available!');
+             return; // Cannot proceed without context
+          }
+
+          // Ensure Web Audio API analyzer exists
+          if (!analyzerRef.current) {
+            analyzerRef.current = audioContextRef.current.createAnalyser();
+            analyzerRef.current.fftSize = 256;
+            analyzerRef.current.smoothingTimeConstant = 0.8;
+            console.log('[iOS Web Audio] Created Web Audio analyzer');
+          }
+
+          // Create MediaElementSource from the iosAudioElement
+          try {
+            console.log('[iOS Web Audio] Creating MediaElementSource for iosAudioElement');
+            iosSourceNode = audioContextRef.current.createMediaElementSource(iosAudioElement);
+            
+            // Connect source -> analyzer -> destination
+            iosSourceNode.connect(analyzerRef.current);
+            analyzerRef.current.connect(audioContextRef.current.destination);
+            console.log('[iOS Web Audio] Connected iosAudioElement to analyzer');
+            
+          } catch (sourceErr) {
+             // Handle potential "already connected" errors gracefully
+             if (sourceErr.message && sourceErr.message.includes('already connected')) {
+               console.log('[iOS Web Audio] iosAudioElement already connected to a node.');
+               // Ensure analyzer is connected to destination anyway
+               try {
+                 analyzerRef.current.connect(audioContextRef.current.destination);
+               } catch (connectErr) { /* Ignore */ }
+             } else {
+               throw sourceErr; // Re-throw other errors
+             }
+          }
           
-          // Create a player directly with URL (for analyzer only)
-          console.log('[iOS Hybrid] Creating Tone.js player with URL:', url);
-          const player = new Tone.Player({
-            url: url,
-            autostart: false,
-            loop: false,
-            volume: 0, // Max volume for analyzer, sound comes from separate HTML5 element
-            onload: () => {
-              console.log('[iOS Hybrid] Tone.js player loaded successfully');
-              setCurrentDialogue(dialogue);
-              
-              // Create an analyzer with default settings
-              console.log('[iOS Hybrid] Creating analyzer');
-              const toneAnalyzer = new Tone.Analyser('fft', 256);
-              
-              // Connect the player to the analyzer
-              console.log('[iOS Hybrid] Connecting player to analyzer');
-              player.connect(toneAnalyzer);
-              
-              // Store the analyzer in our ref
-              analyzerRef.current = toneAnalyzer;
-              
-              // Log analyzer state before playback
-              console.log('[iOS Hybrid] Analyzer created, initial values:', toneAnalyzer.getValue().slice(0, 5));
-              
-              // Start HTML5 Audio playback
-              console.log('[iOS Hybrid] Starting HTML5 Audio playback');
-              iosAudioElement.play()
-                .then(() => {
-                  console.log('[iOS Hybrid] HTML5 Audio playing successfully');
-                  
-                  // Start Tone.js player for analyzer data
-                  player.start();
-                  console.log('[iOS Hybrid] Tone.js player started for analyzer data');
-                  
-                  setIsPlaying(true);
-                  setCurrentTrack(dialogueId);
-                })
-                .catch(err => {
-                  console.error('[iOS Hybrid] HTML5 Audio play error:', err);
-                  // Try to play Tone.js with sound as fallback
-                  console.log('[iOS Hybrid] Falling back to Tone.js for sound');
-                  player.volume.value = 0; // Reset volume
-                  player.start();
-                  setIsPlaying(true);
-                  setCurrentTrack(dialogueId);
-                });
-              
-              // Set up stop handlers
-              iosAudioElement.onended = () => {
-                console.log('[iOS Hybrid] HTML5 Audio ended');
-                player.stop();
-                cleanup();
-              };
-              
-              player.onstop = () => {
-                console.log('[iOS Hybrid] Tone.js player stopped');
-                if (iosAudioElement.paused || iosAudioElement.ended) {
-                  cleanup();
-                } else {
-                  iosAudioElement.pause();
-                  cleanup();
-                }
-              };
-              
-              // Cleanup function
-              const cleanup = () => {
-                console.log('[iOS Hybrid] Audio ended:', dialogueId);
-                setIsPlaying(false);
-                setCurrentDialogue(null);
-                
-                // Remove the audio element
-                if (iosAudioElement && iosAudioElement.parentNode) {
-                  iosAudioElement.parentNode.removeChild(iosAudioElement);
-                }
-              };
-              
-              // Store the player
-              audioRef.current = player;
-            },
-            onerror: (err) => {
-              console.error('[iOS Hybrid] Tone.js player error:', err);
-              // Try HTML5 Audio alone
-              console.log('[iOS Hybrid] Trying HTML5 Audio alone');
-              iosAudioElement.play()
-                .then(() => {
-                  console.log('[iOS Hybrid] HTML5 Audio playing successfully');
-                  setIsPlaying(true);
-                  setCurrentTrack(dialogueId);
-                })
-                .catch(audioErr => {
-                  console.error('[iOS Hybrid] HTML5 Audio play error:', audioErr);
-                  // Clean up
-                  if (iosAudioElement && iosAudioElement.parentNode) {
-                    iosAudioElement.parentNode.removeChild(iosAudioElement);
-                  }
-                });
-            }
-          });
-        } catch (err) {
-          console.error('[iOS Hybrid] Error starting Tone.js:', err);
-          // Try HTML5 Audio alone
-          console.log('[iOS Hybrid] Trying HTML5 Audio alone after Tone.js error');
+          // Set current dialogue info
+          setCurrentDialogue(dialogue);
+
+          // Start HTML5 Audio playback
+          console.log('[iOS Web Audio] Starting HTML5 Audio playback');
           iosAudioElement.play()
             .then(() => {
-              console.log('[iOS Hybrid] HTML5 Audio playing successfully');
+              console.log('[iOS Web Audio] HTML5 Audio playing successfully');
               setIsPlaying(true);
               setCurrentTrack(dialogueId);
             })
-            .catch(audioErr => {
-              console.error('[iOS Hybrid] HTML5 Audio play error:', audioErr);
-              // Clean up
-              if (iosAudioElement && iosAudioElement.parentNode) {
-                iosAudioElement.parentNode.removeChild(iosAudioElement);
-              }
+            .catch(err => {
+              console.error('[iOS Web Audio] HTML5 Audio play error:', err);
+              // Attempt cleanup even on play error
+              cleanup();
             });
+
+          // Set up stop handler for the HTML5 element
+          iosAudioElement.onended = () => {
+            console.log('[iOS Web Audio] HTML5 Audio ended');
+            cleanup();
+          };
+
+          // Cleanup function
+          const cleanup = () => {
+            console.log('[iOS Web Audio] Cleanup:', dialogueId);
+            setIsPlaying(false);
+            setCurrentDialogue(null);
+
+            // Disconnect the source node
+            if (iosSourceNode) {
+              try {
+                iosSourceNode.disconnect();
+                console.log('[iOS Web Audio] Disconnected source node');
+              } catch (disconnectErr) {
+                 console.error('[iOS Web Audio] Error disconnecting source node:', disconnectErr);
+              }
+            }
+            
+            // Remove the audio element
+            if (iosAudioElement && iosAudioElement.parentNode) {
+              iosAudioElement.parentNode.removeChild(iosAudioElement);
+              console.log('[iOS Web Audio] Removed iosAudioElement');
+            }
+          };
+
+          // Store the HTML5 element in audioRef for potential external control (if needed)
+          // Note: This replaces the Tone.Player previously stored here
+          audioRef.current = iosAudioElement;
+
+        // End of the inner try block within startPlaybackAndAnalysis
+        } catch (err) {
+          // Catch errors during context/analyzer/source setup or playback initiation
+          console.error('[iOS Web Audio] Error during setup or playback start:', err);
+          // Attempt cleanup if iosAudioElement exists
+          if (iosAudioElement && iosAudioElement.parentNode) {
+             iosAudioElement.parentNode.removeChild(iosAudioElement);
+          }
+          // We might want to reset state here too if needed
+          setIsPlaying(false);
+          setCurrentDialogue(null);
         }
-      };
+      }; // End of startPlaybackAndAnalysis function definition
       
       // Start Tone.js
-      startTone();
+      startPlaybackAndAnalysis(); // Call the renamed function
       
       return true;
     } catch (err) {
