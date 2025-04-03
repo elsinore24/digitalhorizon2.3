@@ -164,21 +164,21 @@ export default function Scene3D({ dataPerceptionMode }) {
      backgroundElementsRef.current.galaxy = galaxyPlane;
 
     // Create data terminal
-    const terminalGeometry = new THREE.BoxGeometry(1, 2, 1)
-    const terminalMaterial = new THREE.MeshStandardMaterial({
-      color: 0x003366,
-      emissive: 0x00ffff,
-      emissiveIntensity: 0.5,
-      transparent: true,
-      opacity: 0
-    })
+    // const terminalGeometry = new THREE.BoxGeometry(1, 2, 1)
+    // const terminalMaterial = new THREE.MeshStandardMaterial({
+    //   color: 0x003366,
+    //   emissive: 0x00ffff,
+    //   emissiveIntensity: 0.5,
+    //   transparent: true,
+    //   opacity: 0
+    // })
     
-    const terminal = new THREE.Mesh(terminalGeometry, terminalMaterial)
-    terminal.position.set(8, 1, -8)
-    terminal.visible = false
-    terminal.userData = { type: 'terminal', interactable: true }
-    sceneRef.current.add(terminal)
-    dataStructuresRef.current.terminal = terminal
+    // const terminal = new THREE.Mesh(terminalGeometry, terminalMaterial)
+    // terminal.position.set(8, 1, -8) // Original position
+    // terminal.visible = false
+    // terminal.userData = { type: 'terminal', interactable: true }
+    // sceneRef.current.add(terminal)
+    // dataStructuresRef.current.terminal = terminal
 
     // Create data grid (Commented out)
     // const gridHelper = new THREE.GridHelper(20, 20, 0x00ffff, 0x00ffff)
@@ -203,10 +203,10 @@ export default function Scene3D({ dataPerceptionMode }) {
     // }
 
     // Update terminal effect
-    if (dataStructuresRef.current.terminal) {
-      dataStructuresRef.current.terminal.material.emissiveIntensity = 
-        0.5 + Math.sin(time * 3) * 0.3
-    }
+    // if (dataStructuresRef.current.terminal) {
+    //   dataStructuresRef.current.terminal.material.emissiveIntensity =
+    //     0.5 + Math.sin(time * 3) * 0.3
+    // }
 
     // Update grid effect (Commented out)
     // ...

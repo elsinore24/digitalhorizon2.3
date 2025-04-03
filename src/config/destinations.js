@@ -41,18 +41,28 @@ export const destinations = [
   {
     id: 'dest_proxima_outpost',
     name: 'Proxima Centauri Outpost',
-    caption: 'Proxima Outpost',
-    visualStyle: 'alien_outpost',
-    position: { x: 30, y: 55 }, // Inverted Y for distance
-    color: '#9400d3', // Dark violet
-    motion: null
+    // Removed top-level visualStyle, color, caption, motion
+    position: { x: 30, y: 35 }, // Moved further 'away' (up)
+    parentBody: { // Small Planet
+      visualStyle: 'small_planet', // New style needed
+      size: 30, // Example size
+      color: '#d2b48c', // Tan/Brownish color for planet
+      caption: 'Proxima b' // Example planet name
+    },
+    childBody: { // Orbiting Station
+      visualStyle: 'orbiting_station_iss', // New style needed
+      size: 12, // Example size
+      color: '#b0c4de', // Light steel blue / metallic grey
+      caption: 'Proxima Station',
+      motion: { type: 'orbit', speed: 8 } // Orbit animation speed
+    }
   },
   {
     id: 'dest_alien_planet',
     name: 'Exoplanet Kepler-186f', // Example name
     caption: 'Alien Planet',
     visualStyle: 'alien_planet',
-    position: { x: 70, y: 40 }, // Inverted Y for distance
+    position: { x: 20, y: 25 }, // Moved left and further 'away' (up)
     color: '#00fa9a', // Medium spring green
     motion: { type: 'rotate', speed: 0.05 } // Example: slow rotation
   },
@@ -61,8 +71,8 @@ export const destinations = [
     name: 'Galactic Core Structure',
     caption: 'Mega Structure',
     visualStyle: 'mega_structure',
-    position: { x: 50, y: 25 }, // Inverted Y for distance
-    color: '#ffd700', // Gold
+    position: { x: 65, y: 15 }, // Moved right and further 'away' (up)
+    color: '#00ffff', // Cyan
     motion: { type: 'shimmer', speed: 1 } // Example: shimmering effect
   }
 ];

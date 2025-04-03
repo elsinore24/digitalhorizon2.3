@@ -106,6 +106,8 @@
     // Keep circle, maybe add texture later
     background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 20%, var(--echo-color) 80%); // Use semi-transparent white instead of lighten()
     box-shadow: 0 0 20px var(--echo-color);
+    width: 15px; // Make smaller
+    height: 15px; // Make smaller
   }
   .rings { display: none; }
 }
@@ -114,12 +116,14 @@
 .mega_structure {
   .core {
      // Basic star shape using clip-path
-    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    // clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); // Removed star shape
     background: var(--echo-color);
-    width: 25px; // Adjust size for clip-path
-    height: 25px;
+    width: 15px; // Made smaller
+    height: 15px; // Made smaller
     border-radius: 0;
-    box-shadow: 0 0 25px var(--echo-color);
+    box-shadow: 0 0 15px var(--echo-color); // Adjusted shadow
+    animation: terminalPulse 1.5s ease-in-out infinite, slowRotate 20s linear infinite; // Added pulse and rotation
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%); // Triangle shape
   }
   .rings { display: none; }
 }
@@ -130,7 +134,7 @@
   bottom: 110%; // Position above the echo
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.7);
+  // background-color: rgba(0, 0, 0, 0.7); // Removed background
   color: #fff;
   padding: 4px 8px;
   border-radius: 4px;
@@ -220,6 +224,25 @@
    .core {
     background: var(--echo-color); // Use color from config
     border-radius: 0; // Square/blocky
+/* Styles for Proxima System */
+.small_planet {
+  .core {
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 20%, var(--echo-color) 80%); // Use semi-transparent white for highlight
+    border-radius: 50%;
+    box-shadow: 0 0 15px var(--echo-color); // Use base color for shadow
+  }
+}
+
+.orbiting_station_iss {
+  .core {
+    background: var(--echo-color);
+    border-radius: 2px; // Slightly rounded rectangle
+    width: 100%; // Make it wider relative to its container size (12px)
+    height: 40%; // Make it thinner
+    box-shadow: 0 0 8px var(--echo-color);
+    // Potential future enhancement: add ::before/::after for solar panels
+  }
+}
     box-shadow: 0 0 10px var(--echo-color);
   }
 }
@@ -246,5 +269,24 @@
   100% {
     transform: scale(2);
     opacity: 0;
+  }
+}
+@keyframes terminalPulse {
+  0%, 100% {
+    opacity: 0.6;
+    box-shadow: 0 0 10px var(--echo-color);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 20px var(--echo-color);
+  }
+}
+
+@keyframes slowRotate {
+  from {
+    transform: rotate(0deg) rotateY(0deg);
+  }
+  to {
+    transform: rotate(360deg) rotateY(360deg);
   }
 }

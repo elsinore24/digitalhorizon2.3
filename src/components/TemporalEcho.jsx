@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState } from 'react' // Removed unused useState
 import { motion } from 'framer-motion'
 // Removed unused imports: useEffect, fragmentTypes, useGameState, InteractionPrompt, FragmentAnalyzer, useFragmentCollection
 import styles from './TemporalEcho.module.scss'
@@ -20,27 +20,10 @@ export default function TemporalEcho({
 
   // Determine if this is a compound destination
   const isCompound = !!parentBody;
-  const [showCaption, setShowCaption] = useState(false) // State for temporary caption
-  // Removed unused state and hooks: showPrompt, mousePos, gameState, useFragmentCollection related state/functions
+  // Removed unused state and hooks: showCaption, captionToShow, showPrompt, mousePos, gameState, useFragmentCollection related state/functions
   // Removed config derived from fragmentTypes
 
-  // Store the caption text to display
-  const [captionToShow, setCaptionToShow] = useState('');
-
-  const handleClick = (e, captionText) => {
-    e.preventDefault();
-    e.stopPropagation(); // Prevent potential nested clicks if needed later
-
-    setCaptionToShow(captionText); // Set the specific caption
-    setShowCaption(true);
-    const timer = setTimeout(() => {
-      setShowCaption(false);
-      setCaptionToShow(''); // Clear caption text
-    }, 3000); // Show for 3 seconds
-
-    return () => clearTimeout(timer);
-  };
-
+  // Removed handleClick function
   // Common style for the main container div
   const containerStyle = {
     left: `${position.x}%`,
@@ -72,7 +55,7 @@ export default function TemporalEcho({
         <motion.div
           className={`${styles.parentBody} ${styles[parentBody.visualStyle] || ''}`}
           style={parentStyle}
-          onClick={(e) => handleClick(e, parentBody.caption)}
+          // onClick={(e) => handleClick(e, parentBody.caption)} // Removed onClick
           // Add motion config for parent if needed later
         >
           {/* Core visual element for parent, styled by CSS */}
@@ -97,9 +80,9 @@ export default function TemporalEcho({
         )}
 
         {/* Caption Display (Positioned relative to the main container) */}
-        {showCaption && (
-          <div className={styles.caption}>{captionToShow}</div>
-        )}
+        {/* Always show parent caption for compound destinations */}
+        <div className={styles.caption}>{parentBody.caption}</div>
+
       </div>
     );
 
@@ -113,16 +96,16 @@ export default function TemporalEcho({
       <motion.div
         className={`${styles.echo} ${styles[visualStyle] || ''}`} // Base + specific style
         style={{ ...containerStyle, ...simpleStyle }}
-        onClick={(e) => handleClick(e, caption)}
+        // onClick={(e) => handleClick(e, caption)} // Removed onClick
         // TODO: Implement animations based on motionConfig if needed
       >
         {/* Core visual element, styled by CSS */}
         <div className={styles.core}></div>
 
         {/* Caption Display */}
-        {showCaption && (
-          <div className={styles.caption}>{captionToShow}</div>
-        )}
+        {/* Always show caption for simple destinations */}
+        <div className={styles.caption}>{caption}</div>
+
       </motion.div>
     );
   }
