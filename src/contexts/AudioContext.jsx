@@ -389,7 +389,7 @@ export function AudioProvider({ children }) {
             url: url,
             autostart: false,
             loop: false,
-            volume: -20, // Increase from -100 to -20 to get better analyzer data while still keeping it quiet
+            volume: 0, // Max volume for analyzer, sound comes from separate HTML5 element
             onload: () => {
               console.log('[iOS Hybrid] Tone.js player loaded successfully');
               setCurrentDialogue(dialogue);
