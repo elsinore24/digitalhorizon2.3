@@ -426,6 +426,10 @@ export function AudioProvider({ children }) {
           // Set current dialogue info
           setCurrentDialogue(dialogue);
 
+          // Set initial mute state based on context
+          iosAudioElement.muted = isMuted;
+          console.log(`[iOS Web Audio] Initial mute state set to: ${isMuted}`);
+
           // Start HTML5 Audio playback
           console.log('[iOS Web Audio] Starting HTML5 Audio playback');
           iosAudioElement.play()
@@ -495,7 +499,7 @@ export function AudioProvider({ children }) {
       console.error('[iOS Hybrid] Failed to play audio:', err);
       return false;
     }
-  }, []);
+  }, [isMuted]); // Add isMuted dependency
   
   // Main function to play narration audio
   const playNarration = useCallback(async (dialogueId) => {
@@ -610,11 +614,14 @@ export function AudioProvider({ children }) {
       // Mute/unmute the primary audio element used for playback/analysis
       if (audioElementRef.current) {
         audioElementRef.current.muted = newMuted;
-        console.log(`Audio element muted: ${newMuted}`);
+        console.log(`Persistent audio element muted: ${newMuted}`);
       }
-      // Note: This might not mute sounds played *only* through Tone.js if any exist,
-      // but narration seems routed via audioElementRef.
-      // If global Tone mute is needed: Tone.Destination.mute = newMuted;
+      // Also mute/unmute the currently active audio instance (could be the temporary iOS one)
+      if (audioRef.current) {
+        audioRef.current.muted = newMuted;
+        console.log(`Active audioRef element muted: ${newMuted}`);
+      }
+      // Note: If global Tone mute is needed: Tone.Destination.mute = newMuted;
       return newMuted;
     });
   }, []); // No dependencies needed as it only uses refs and setIsMuted
