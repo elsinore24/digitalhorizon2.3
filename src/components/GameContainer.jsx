@@ -39,7 +39,7 @@ export default function GameContainer() {
         <Route path="/" element={<LunarArrival dataPerceptionMode={gameState.dataPerceptionActive} />} />
       </Routes>
       <DataPerceptionOverlay active={gameState.dataPerceptionActive} />
-      <StabilityMeter />
+      {gameState.dataPerceptionActive && <StabilityMeter />} {/* Only show when active */}
       <NarrationIndicator />
       <button 
         className={styles.perceptionToggle} 

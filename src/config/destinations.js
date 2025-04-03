@@ -6,7 +6,7 @@ export const destinations = [
     name: 'Moon',
     caption: 'Moon',
     visualStyle: 'moon', // CSS class identifier
-    position: { x: 35, y: 85 }, // Moved closer (down more)
+    position: { x: 35, y: 80 }, // Moved up slightly
     color: '#c0c0c0', // Silver grey
     motion: null // No special motion
   },

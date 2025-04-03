@@ -78,9 +78,26 @@
 .satellite {
   .core {
     border-radius: 0;
-    transform: translate(-50%, -50%) rotate(45deg); // Diamond
+    // transform: translate(-50%, -50%) rotate(45deg); // Removed diamond rotation
+    transform: translate(-50%, -50%); // Keep centering
     background: var(--echo-color);
     box-shadow: 0 0 15px var(--echo-color);
+    width: 6px; // Made core even smaller
+    height: 4px; // Made core even smaller
+    position: relative; // For pseudo-elements
+
+    &::before, &::after {
+      content: '';
+      position: absolute;
+      background: var(--echo-color);
+      width: 2px; // Panel width (made smaller)
+      height: 12px; // Panel height (made smaller)
+      border-radius: 1px;
+      top: 50%;
+      transform: translateY(-50%); // Center vertically
+    }
+    &::before { left: -6px; } // Adjusted left panel position
+    &::after { right: -6px; } // Adjusted right panel position
   }
   .rings { display: none; }
 }
@@ -223,7 +240,7 @@
 .orbiting_outpost {
    .core {
     background: var(--echo-color); // Use color from config
-    border-radius: 0; // Square/blocky
+    border-radius: 50%; // Changed to circle
 /* Styles for Proxima System */
 .small_planet {
   .core {
@@ -244,6 +261,25 @@
   }
 }
     box-shadow: 0 0 10px var(--echo-color);
+    position: relative; // Needed for pseudo-elements
+    width: 60%; // Make core smaller relative to container
+    height: 60%;
+    top: 50%; // Center core within childBody
+    left: 50%;
+    transform: translate(-50%, -50%); // Center core
+
+    &::before, &::after {
+      content: '';
+      position: absolute;
+      background: var(--echo-color);
+      width: 150%; // Long thin lines
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform-origin: center;
+    }
+    &::before { transform: translate(-50%, -50%) rotate(45deg); }
+    &::after { transform: translate(-50%, -50%) rotate(-45deg); }
   }
 }
 
@@ -253,11 +289,11 @@
 @keyframes orbit {
   from {
     // Start at top-center relative to parent, move out slightly
-    transform: translate(-50%, -70%) rotate(0deg) translateX(50px) rotate(0deg);
+    transform: translate(-50%, -50%) rotate(0deg) translateX(35px) rotate(0deg); // Centered orbit vertically
   }
   to {
      // End at same position after full rotation
-    transform: translate(-50%, -70%) rotate(360deg) translateX(50px) rotate(-360deg);
+    transform: translate(-50%, -50%) rotate(360deg) translateX(35px) rotate(-360deg); // Centered orbit vertically
   }
 }
 
