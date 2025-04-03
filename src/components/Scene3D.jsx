@@ -120,10 +120,12 @@ export default function Scene3D({ dataPerceptionMode }) {
       size: 1.5,
       sizeAttenuation: true, // Smaller when farther
       transparent: true,
-      opacity: 0.8
+      opacity: 0.8,
+      fog: false // Make stars ignore scene fog
     });
     const stars = new THREE.Points(starGeometry, starMaterial);
     sceneRef.current.add(stars);
+    sceneRef.current.fog = new THREE.FogExp2(0x000000, 0.004); // Increased fog density
     backgroundElementsRef.current.stars = stars;
     starsRef.current = stars; // Store for rotation
 
@@ -156,8 +158,8 @@ export default function Scene3D({ dataPerceptionMode }) {
       blending: THREE.AdditiveBlending
     });
      const galaxyPlane = new THREE.Mesh(new THREE.PlaneGeometry(800, 100), galaxyMaterial);
-     galaxyPlane.position.z = -300;
-     galaxyPlane.rotation.x = -Math.PI * 0.2;
+     galaxyPlane.position.z = -1200; // Pushed significantly further back
+     galaxyPlane.rotation.x = -Math.PI * 0.25; // Adjusted rotation to soften edge
      sceneRef.current.add(galaxyPlane);
      backgroundElementsRef.current.galaxy = galaxyPlane;
 

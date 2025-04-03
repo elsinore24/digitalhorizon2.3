@@ -25,10 +25,10 @@ export default function DataPerceptionOverlay({ active }) {
           <div className={styles.scanlines}></div>
           <div className={styles.dataStreams}></div>
           <div className={styles.glowEffect}></div>
-          <div className={styles.dataPatterns}>
+          {/* <div className={styles.dataPatterns}>
             {Array.from({ length: 5 }).map((_, i) => (
-              <div 
-                key={i} 
+              <div
+                key={i}
                 className={styles.dataNode}
                 style={{
                   left: `${Math.random() * 100}%`,
@@ -36,7 +36,7 @@ export default function DataPerceptionOverlay({ active }) {
                 }}
               />
             ))}
-          </div>
+          </div> */}
         </motion.div>
       )}
     </AnimatePresence>
