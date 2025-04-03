@@ -76,9 +76,11 @@ export default function AudioVisualizer() {
             // Convert from dB (-100 to 0 range) to 0-255 range for visualization
             for (let i = 0; i < analyzerData.length; i++) {
               // Tone.js FFT analyzer returns values in dB from -Infinity to 0
-              // Map -100..0 to 0..255 (adjusting range slightly)
-              const normalizedDb = Math.max(0, Math.min(1, (analyzerData[i] + 100) / 100)); // Normalize -100dB to 0dB -> 0 to 1
-              dataArray[i] = Math.floor(normalizedDb * 255);
+              // Map -100..0 to 0..1 (adjusting range slightly)
+              const normalizedDb = Math.max(0, Math.min(1, (analyzerData[i] + 100) / 100));
+              // Scale the normalized value more aggressively to utilize more of the 0-255 range
+              // Experiment with the multiplier (e.g., 1.5) to adjust sensitivity
+              dataArray[i] = Math.min(255, Math.floor(normalizedDb * 255 * 1.5));
             }
             
             useRealData = true
