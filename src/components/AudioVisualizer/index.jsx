@@ -132,7 +132,7 @@ export default function AudioVisualizer() {
         const normalizedDistance = distanceFromCenter / centerIndex
         
         // More pronounced dome effect with a steeper curve
-        const positionFactor = Math.max(0, 1 - Math.pow(normalizedDistance, 2.5)) // Increased exponent for sharper drop-off
+        const positionFactor = Math.max(0, 1 - Math.pow(normalizedDistance, 3.5)) // Increased exponent further for sharper drop-off
         
         // Boost center bars even more (within 5 bars of center)
         if (distanceFromCenter < 5) {
@@ -142,7 +142,7 @@ export default function AudioVisualizer() {
         
         // Scale the height based on the frequency value and position
         // Increased multiplier range for taller center bars
-        const heightMultiplier = 0.1 + (positionFactor * 2.2) // Decreased base multiplier
+        const heightMultiplier = 0.1 + (positionFactor * 2.5) // Increased multiplier for taller center
         
         // Calculate height based on frequency data with overall scaling factor
         const height = (value / 255) * HEIGHT * heightMultiplier * 0.7 // Increased from 0.6 to 0.7
