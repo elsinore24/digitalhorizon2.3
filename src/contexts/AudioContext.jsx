@@ -198,7 +198,7 @@ export function AudioProvider({ children }) {
         const silentAudio = document.createElement('audio');
         silentAudio.id = 'ios-audio-unlock';
         // Try using a data URI if the file doesn't exist
-        silentAudio.src = '/audio/utils/silent.mp3';
+        silentAudio.src = '/audio/utils/silence.wav';
         silentAudio.volume = 0.01; // Set to minimum volume
         silentAudio.loop = false;
         silentAudio.preload = 'auto';
