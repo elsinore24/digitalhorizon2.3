@@ -1,14 +1,15 @@
 .visualizer {
-  height: 400px;
+  height: 400px; // Keep height
   background: transparent;
-  display: block;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 10; /* Ensure it's above other elements */
-  width: 100%;
-  max-width: 800px;
+  display: block; // Keep as block
+  // position: absolute; // Removed
+  // left: 50%; // Removed
+  // top: 50%; // Removed
+  // transform: translate(-50%, -50%); // Removed
+  z-index: 10; /* Keep z-index */
+  width: 100%; // Ensure it takes available width from flex parent
+  max-width: 800px; // Keep max-width constraint
+  margin: 0 auto; // Add auto horizontal margins for safety within flex item
 }
 
 .visualizerCanvas {
