@@ -28,7 +28,7 @@
   font-family: 'Arial', sans-serif; /* Consider a more readable font for longer text */
   white-space: pre-wrap; /* Preserve line breaks in the text */
   text-align: left;
-  min-height: 100px; /* Example minimum height */
+  min-height: 175px; /* Further increased minimum height */
 }
 
 .navigation {
@@ -79,6 +79,33 @@
   color: red;
   font-weight: bold;
 }
+/* Add these styles */
+.lunarImageContainer {
+  position: relative;
+  width: 90%;
+  max-width: 400px;
+  margin: 0 auto 20px auto;
+  opacity: 0;
+  transition: opacity 2s ease-in; // 2-second fade-in
+}
+
+.lunarImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+// Style to trigger the fade-in
+.fadeInActive {
+  opacity: 1;
+}
+
+// Ensure image container is also hidden when data perception mode is active
+.hidden .lunarImageContainer {
+   display: none;
+}
+
 
 // Class to explicitly hide the container
 .hidden {

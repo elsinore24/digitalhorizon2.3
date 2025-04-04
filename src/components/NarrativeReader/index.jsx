@@ -8,6 +8,7 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Accept dat
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const { playAudioFile } = useAudio(); // Get the new function
+  const [imageVisible, setImageVisible] = useState(false); // State for image fade-in
   // const { playAudio } = useAudio(); // Placeholder for audio hook usage
 
   useEffect(() => {
@@ -49,6 +50,18 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Accept dat
   // Re-add playAudioFile dependency since it's used in the effect
   }, [narrativeId]); // Removed playAudioFile from dependency array again to test loop theory
 
+  // Effect to trigger image fade-in
+  useEffect(() => {
+    if (narrativeData) { // Only trigger if narrative data is loaded
+      const timer = setTimeout(() => {
+        setImageVisible(true);
+      }, 100); // Short delay to ensure rendering before transition starts
+      return () => clearTimeout(timer); // Cleanup on unmount or narrative change
+    } else {
+      setImageVisible(false); // Reset if narrative is cleared
+    }
+  }, [narrativeData]); // Depend on narrativeData
+
   const handleNextPage = () => {
     if (narrativeData && currentPageIndex < narrativeData.pages.length - 1) {
       setCurrentPageIndex(prevIndex => prevIndex + 1);
@@ -80,22 +93,34 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Accept dat
   return (
     <div
       className={`${styles.narrativeContainer} ${dataPerceptionMode ? styles.hidden : ''}`} // Conditionally add hidden class
-      // style={{ display: dataPerceptionMode ? 'none' : 'block' }} // Removed inline style
     >
-      <div className={styles.narrativeBox}>
-        <div className={styles.narrativeText}>
-          {currentPageText}
-        </div>
-        <div className={styles.navigation}>
-          <button onClick={handlePrevPage} disabled={isFirstPage}>
-            Previous
-          </button>
-          <span>Page {currentPageIndex + 1} of {narrativeData.pages.length}</span>
-          <button onClick={handleNextPage} disabled={isLastPage}>
-            Next
-          </button>
-        </div>
-      </div>
+      {/* Use a Fragment to return multiple elements */}
+      <>
+        {/* NEW: Image Container */}
+        {narrativeData && ( // Only show image container if there's a narrative
+          <div className={`${styles.lunarImageContainer} ${imageVisible ? styles.fadeInActive : ''}`}>
+            <img src="/front_pic/moon.png" alt="Lunar surface" className={styles.lunarImage} />
+          </div>
+        )}
+
+        {/* Existing Narrative Box */}
+        {narrativeData && ( // Conditionally render narrative box as well
+          <div className={styles.narrativeBox}>
+            <div className={styles.narrativeText}>
+              {currentPageText}
+            </div>
+            <div className={styles.navigation}>
+              <button onClick={handlePrevPage} disabled={isFirstPage}>
+                Previous
+              </button>
+              <span>Page {currentPageIndex + 1} of {narrativeData.pages.length}</span>
+              <button onClick={handleNextPage} disabled={isLastPage}>
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </>
     </div>
   );
 };
