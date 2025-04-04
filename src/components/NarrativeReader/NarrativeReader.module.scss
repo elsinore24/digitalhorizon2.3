@@ -2,7 +2,7 @@
 
 .narrativeContainer {
   position: fixed; /* Or adjust positioning as needed */
-  bottom: 40px;
+  bottom: 100px; /* Further increased bottom margin */
   left: 50%;
   transform: translateX(-50%);
   width: 90%;
@@ -12,8 +12,8 @@
 }
 
 .narrativeBox {
-  background: rgba(0, 0, 0, 0.85); /* Similar to DialogueSystem */
-  border: 1px solid var(--color-primary);
+  background: transparent; /* Removed black background */
+  /* border: 1px solid var(--color-primary); Removed border */
   border-radius: 4px;
   padding: 20px;
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
