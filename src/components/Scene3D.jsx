@@ -125,7 +125,7 @@ export default function Scene3D({ dataPerceptionMode }) {
     });
     const stars = new THREE.Points(starGeometry, starMaterial);
     sceneRef.current.add(stars);
-    sceneRef.current.fog = new THREE.FogExp2(0x000000, 0.004); // Increased fog density
+    sceneRef.current.fog = new THREE.FogExp2(0x000000, 0.003); // Reduced fog density slightly
     backgroundElementsRef.current.stars = stars;
     starsRef.current = stars; // Store for rotation
 

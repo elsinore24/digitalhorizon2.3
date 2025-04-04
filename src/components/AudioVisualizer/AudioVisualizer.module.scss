@@ -1,5 +1,5 @@
 .visualizer {
-  height: 100px; // Reduced height
+  height: 50px; // Further reduced height
   background: transparent;
   display: block; // Keep as block
   // position: absolute; // Removed
@@ -9,7 +9,7 @@
   z-index: 10; /* Keep z-index */
   width: 100%; // Ensure it takes available width from flex parent
   max-width: 800px; // Keep max-width constraint
-  margin: 0 auto; // Add auto horizontal margins for safety within flex item
+  margin: 0 auto; /* Revert to centering within parent */
 }
 
 .visualizerCanvas {

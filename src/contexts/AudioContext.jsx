@@ -621,7 +621,7 @@ export function AudioProvider({ children }) {
     const url = `/${filePath}`;
 
     // Placeholder info - might not be needed if playback functions don't rely on it
-    const tempDialogueInfo = { speaker: 'Narrator', text: '' };
+    const tempDialogueInfo = { speaker: '', text: '' };
 
     try {
       // --- Stop Previous Audio ---

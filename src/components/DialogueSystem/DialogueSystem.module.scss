@@ -19,8 +19,9 @@
 .dialogueHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center; /* Center items horizontally */
   margin-bottom: 15px;
+  /* position: relative; Removed */
 }
 
 .speakerName {
@@ -29,6 +30,7 @@
   text-transform: uppercase;
   letter-spacing: 2px;
   font-weight: bold;
+  /* margin-right removed, speaker name is empty anyway */
 }
 
 .visualizerContainer {
@@ -36,6 +38,10 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  width: 200px; /* Added explicit width */
+  /* Absolute positioning removed */
+  /* Ensure no horizontal margins */
+  /* Ensure no horizontal margins */
 }
 
 .visualizerLabel {
