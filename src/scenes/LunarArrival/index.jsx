@@ -22,7 +22,7 @@ const LunarArrival = ({ dataPerceptionMode }) => {
     const isFirstVisit = !gameState.scenesVisited?.includes('lunar_arrival')
     if (isFirstVisit && !showEnter) {
       // Trigger the NarrativeReader instead of playing narration directly
-      setActiveNarrativeId('professor_joker_intro');
+      setActiveNarrativeId('moon_dialogue');
       visitScene('lunar_arrival');
     }
   }, [gameState, visitScene, showEnter]); // Removed playNarration from dependencies
