@@ -13,7 +13,7 @@ export const destinations = [
   {
     id: 'dest_mars_compound', // Updated ID for clarity
     name: 'Mars System', // Updated name
-    position: { x: 80, y: 75 }, // Moved down towards bottom right
+    position: { x: 80, y: 70 }, // Moved slightly higher
     parentBody: { // Mars Planet
       visualStyle: 'planet_mars',
       size: 40, // Made smaller
