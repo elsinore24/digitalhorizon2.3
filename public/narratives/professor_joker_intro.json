@@ -1,0 +1,10 @@
+{
+  "id": "professor_joker_intro",
+  "audio": "audio/narration/lunar_arrival_intro.mp3",
+  "pages": [
+    "Professor Joker? Can you hear me? Your neural connection is stabilizing... There you are. The transfer was rougher than anticipated.",
+    "Your consciousness has been projected into this data construct while your physical form remains in stasis back at the institute.",
+    "I'm ALARA - Advanced Linguistic Analysis and Retrieval Algorithm.",
+    "I've been tasked with guiding you through these forgotten data fragments."
+  ]
+}

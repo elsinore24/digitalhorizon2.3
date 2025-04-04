@@ -611,6 +611,62 @@ export function AudioProvider({ children }) {
       console.error('Failed to set up narration:', err);
     }
   }, [isIOS, playAudioWithElement, playAudioWithTone]);
+
+  // REFINED Function to play an audio file directly from its path
+  const playAudioFile = useCallback(async (filePath) => {
+    if (!filePath) {
+      return;
+    }
+    // Construct URL assuming filePath is relative to public root
+    const url = `/${filePath}`;
+
+    // Placeholder info - might not be needed if playback functions don't rely on it
+    const tempDialogueInfo = { speaker: 'Narrator', text: 'Narrative playing...' };
+
+    try {
+      // --- Stop Previous Audio ---
+      // Check the audioRef which might hold an iOS specific element from playAudioWithTone
+      if (audioRef.current && typeof audioRef.current.pause === 'function' && !audioRef.current.paused) {
+        audioRef.current.pause();
+        // Check if it's the iOS specific element created by playAudioWithTone and remove it
+        if (audioRef.current.id === 'ios-audio-playback-element' && audioRef.current.parentNode) {
+             audioRef.current.parentNode.removeChild(audioRef.current);
+        }
+        audioRef.current = null; // Clear the ref
+      }
+      // Also check the main audioElementRef used for non-iOS and analysis
+      if (audioElementRef.current && !audioElementRef.current.paused) {
+         audioElementRef.current.pause();
+         audioElementRef.current.src = ''; // Detach source
+      }
+      // Reset state *after* stopping
+      setIsPlaying(false);
+      setCurrentTrack(null);
+      // Avoid clearing currentDialogue here, let the playback functions handle it
+      // setCurrentDialogue(null);
+      // --- End Stop Previous Audio ---
+
+
+      // Determine playback method based on iOS or fallback logic
+      if (isIOS) {
+        // playAudioWithTone creates its own element and connects analyzer
+        playAudioWithTone(url, filePath, tempDialogueInfo); // Use filePath as ID
+      } else {
+        // playAudioWithElement uses audioElementRef and calls connectAnalyzerToAudio
+        const elementSuccess = playAudioWithElement(url, filePath, tempDialogueInfo); // Use filePath as ID
+        if (!elementSuccess) {
+           // Fallback could be added here if needed
+        }
+      }
+    } catch (err) {
+      console.error(`[playAudioFile] Error playing file ${filePath}:`, err); // Keep error log
+      // Reset state on error
+      setIsPlaying(false);
+      setCurrentTrack(null);
+      setCurrentDialogue(null);
+    }
+
+  }, [isIOS, playAudioWithElement, playAudioWithTone, connectAnalyzerToAudio]); // Added connectAnalyzerToAudio dependency
   
   // Function to stop playback
   const stopNarration = useCallback(() => {
@@ -659,7 +715,8 @@ export function AudioProvider({ children }) {
       isIOS,
       analyzer: analyzerRef.current,
       isMuted, // Expose mute state
-      toggleMute // Expose toggle function
+      toggleMute, // Expose toggle function
+      playAudioFile // Expose new function
     }}>
       {children}
     </AudioContext.Provider>

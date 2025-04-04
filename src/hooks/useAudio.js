@@ -35,6 +35,13 @@ export default function useAudio() {
     }
     return new Float32Array(0)
   }, [context])
+
+  // Wrap playAudioFile for stable reference
+  const playAudioFile = useCallback((filePath) => {
+    if (context && context.playAudioFile) {
+      context.playAudioFile(filePath);
+    }
+  }, [context]);
   
   // Return a consistent object shape every time
   return {
@@ -46,6 +53,7 @@ export default function useAudio() {
     getAnalyzerData,
     analyzer: context ? context.analyzer : null,
     isMuted: context ? context.isMuted : false, // Add isMuted state
-    toggleMute // Add toggleMute function
-  }
+    toggleMute, // Add toggleMute function
+    playAudioFile // Add new function
+}
 }
