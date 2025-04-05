@@ -28,6 +28,20 @@ export default function useAudio() {
       context.toggleMute();
     }
   }, [context]);
+
+  // Wrap pauseAudio for stable reference
+  const pauseAudio = useCallback(() => {
+    if (context && context.pauseAudio) {
+      context.pauseAudio();
+    }
+  }, [context]);
+
+  // Wrap resumeAudio for stable reference
+  const resumeAudio = useCallback(() => {
+    if (context && context.resumeAudio) {
+      context.resumeAudio();
+    }
+  }, [context]);
   
   const getAnalyzerData = useCallback(() => {
     if (context && context.getAnalyzerData) {
@@ -54,6 +68,8 @@ export default function useAudio() {
     analyzer: context ? context.analyzer : null,
     isMuted: context ? context.isMuted : false, // Add isMuted state
     toggleMute, // Add toggleMute function
-    playAudioFile // Add new function
-}
+    playAudioFile, // Add new function
+    pauseAudio, // Add pause function
+    resumeAudio // Add resume function
+  }
 }
