@@ -56,10 +56,14 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Accept dat
         setNarrativeData(data);
         // Trigger audio playback using the narrativeId to construct the correct path
         // The audio files are stored in public/audio/narration/ with the narrativeId as filename
-        playAudioFile(`audio/narration/${narrativeId}.mp3`); // Construct path from narrativeId
+        if (data.audio) {
+          playAudioFile(data.audio); // Use the path from the JSON data
+        } else {
+          console.warn(`Narrative ${narrativeId} is missing the 'audio' property in its JSON data.`);
+        }
         
         // Removed TODO related to data.audio
-        // playAudio(data.audio);
+        // Removed line: playAudio(data.audio);
       } catch (e) {
         console.error("[NarrativeReader] CATCH BLOCK: Failed to fetch narrative:", e); // Add specific log
         setError(`Failed to load narrative: ${narrativeId}. Error: ${e.message}`);

@@ -5,10 +5,10 @@ import * as Tone from 'tone'
 export const AudioContext = createContext(null)
 
 // Modified to always return local URL to avoid CORS issues
-const getAudioUrl = (filename) => {
-  // Always use local audio files to avoid CORS issues
-  return `/audio/narration/${filename}`
-}
+// const getAudioUrl = (filename) => {
+//   // Always use local audio files to avoid CORS issues
+//   return `/audio/narration/${filename}`
+// }
 
 export function AudioProvider({ children }) {
   const [isPlaying, setIsPlaying] = useState(false)
@@ -116,7 +116,7 @@ export function AudioProvider({ children }) {
         console.error('Failed to create audio context:', err);
       }
     }
-  }, []);
+  }, []); // isMuted is handled via ref access, not as a dependency
   
   // Helper function for oscillator-based unlocking
   const tryOscillatorUnlock = useCallback(() => {
@@ -133,9 +133,10 @@ export function AudioProvider({ children }) {
     }
   }, []);
   
-  // Connect analyzer to audio element
-  const connectAnalyzerToAudio = useCallback(() => {
-    if (!audioElementRef.current || !audioContextRef.current) return;
+  // Connect analyzer to audio element - use a stable reference with useRef
+  // This function doesn't depend on any state, only refs, so it doesn't need to be recreated
+  const connectAnalyzerToAudioRef = useRef((audioElement) => {
+    if (!audioElement || !audioContextRef.current) return;
     
     try {
       // Create analyzer if it doesn't exist
@@ -158,7 +159,7 @@ export function AudioProvider({ children }) {
         }
         
         // Create a new media stream source
-        mediaStreamSourceRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+        mediaStreamSourceRef.current = audioContextRef.current.createMediaElementSource(audioElement);
         console.log('Created new media element source');
         
         // Connect the media source to the analyzer and destination
@@ -183,6 +184,13 @@ export function AudioProvider({ children }) {
       }
     } catch (err) {
       console.error('Failed to connect analyzer:', err);
+    }
+  });
+  
+  // Wrapper function to maintain API compatibility
+  const connectAnalyzerToAudio = useCallback(() => {
+    if (audioElementRef.current) {
+      connectAnalyzerToAudioRef.current(audioElementRef.current);
     }
   }, []);
   
@@ -325,11 +333,12 @@ export function AudioProvider({ children }) {
         audioContextRef.current = null;
       }
     };
-  }, [isIOS, initAudioContext, tryOscillatorUnlock]); // Added dependencies
+  }, [isIOS]); // Only depend on isIOS, other functions are stable refs
 
   // Effect to handle pending playback when context resumes
   // Play audio using HTML5 Audio element
-  const playAudioWithElement = useCallback((url, dialogueId, dialogue) => {
+  // Create stable function references using useRef
+  const playAudioWithElementRef = useRef((url, dialogueId, dialogue) => {
     if (!audioElementRef.current) return false;
     
     try {
@@ -339,7 +348,7 @@ export function AudioProvider({ children }) {
         setCurrentDialogue(dialogue);
         
         // Connect analyzer to the audio element
-        connectAnalyzerToAudio();
+        connectAnalyzerToAudioRef.current(audioElementRef.current);
         
         // Play the audio only if context is running
         if (audioContextRef.current && audioContextRef.current.state === 'running') {
@@ -376,10 +385,16 @@ export function AudioProvider({ children }) {
       console.error('Failed to play audio with element:', err);
       return false;
     }
-  }, [connectAnalyzerToAudio]);
+  });
+  
+  // Wrapper function to maintain API compatibility
+  const playAudioWithElement = useCallback((url, dialogueId, dialogue) => {
+    return playAudioWithElementRef.current(url, dialogueId, dialogue);
+  }, []);
 
   // Play audio using Tone.js for analyzer and HTML5 Audio for sound on iOS
-  const playAudioWithTone = useCallback((url, dialogueId, dialogue) => {
+  // Create a stable reference with useRef
+  const playAudioWithToneRef = useRef((url, dialogueId, dialogue) => {
     try {
       console.log('[iOS Hybrid] Starting playback for:', dialogueId);
       console.log('[iOS Hybrid] Audio URL:', url);
@@ -530,27 +545,35 @@ export function AudioProvider({ children }) {
       console.error('[iOS Hybrid] Failed to play audio:', err);
       return false;
     }
-  }, [isMuted]); // Add isMuted dependency
+  });
+  
+  // Wrapper function to maintain API compatibility
+  const playAudioWithTone = useCallback((url, dialogueId, dialogue) => {
+    return playAudioWithToneRef.current(url, dialogueId, dialogue);
+  }, []);
 
+  // Create a stable reference for the context state change handler
+  const handleContextStateChangeRef = useRef((context, pendingPlayback) => {
+    if (context.state === 'running' && pendingPlayback) {
+      console.log('Audio context is running, attempting pending playback:', pendingPlayback.dialogueId || pendingPlayback.url);
+      // Call the appropriate playback function based on the stored flag
+      if (pendingPlayback.isTone) {
+        playAudioWithToneRef.current(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
+      } else {
+        playAudioWithElementRef.current(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
+      }
+      // Clear the pending playback state
+      setPendingPlayback(null);
+    }
+  });
+  
   // Effect to handle pending playback when context resumes
   useEffect(() => {
     const context = audioContextRef.current;
     if (!context) return;
 
     const handleContextStateChange = () => {
-      if (context.state === 'running' && pendingPlayback) {
-        console.log('Audio context is running, attempting pending playback:', pendingPlayback.dialogueId || pendingPlayback.url);
-        // Call the appropriate playback function based on the stored flag
-        // NOTE: We need to access the functions via refs or ensure they are stable if defined outside
-        // For simplicity here, assuming they are accessible in scope after reordering
-        if (pendingPlayback.isTone) {
-          playAudioWithTone(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
-        } else {
-          playAudioWithElement(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
-        }
-        // Clear the pending playback state
-        setPendingPlayback(null);
-      }
+      handleContextStateChangeRef.current(context, pendingPlayback);
     };
 
     context.addEventListener('statechange', handleContextStateChange);
@@ -561,108 +584,106 @@ export function AudioProvider({ children }) {
     return () => {
       context.removeEventListener('statechange', handleContextStateChange);
     };
-  // Dependencies: pendingPlayback state. The playback functions are now defined above,
-  // so they are stable references within this effect's closure.
-  }, [pendingPlayback]); // Removed playAudioWithElement and playAudioWithTone from dependencies
+  }, [pendingPlayback]); // Only depend on pendingPlayback
 
   
-  // Main function to play narration audio
-  const playNarration = useCallback(async (dialogueId) => {
-    try {
-      // Get dialogue data
-      const dialogue = dialogueData[dialogueId];
-      if (!dialogue) {
-        console.warn(`Dialogue ID "${dialogueId}" not found`);
-        return;
-      }
+  // // Main function to play narration audio (Now handled by NarrativeReader calling playAudioFile)
+  // const playNarration = useCallback(async (dialogueId) => {
+  //   try {
+  //     // Get dialogue data
+  //     const dialogue = dialogueData[dialogueId];
+  //     if (!dialogue) {
+  //       console.warn(`Dialogue ID "${dialogueId}" not found`);
+  //       return;
+  //     }
+  //
+  //     console.log('Creating new audio instance for:', dialogueId);
+  //
+  //     // Always use local audio files to avoid CORS issues
+  //     // const localUrl = getAudioUrl(`${dialogueId}.mp3`); // getAudioUrl is now commented out
+  //     // console.log('Using local audio URL to avoid CORS:', localUrl);
+  //
+  //     // For iOS, ensure audio is unlocked before playing
+  //     if (isIOS) {
+  //       console.log('[iOS] Preparing for iOS playback');
+  //
+  //       // Play silent audio first to unlock iOS audio
+  //       const playSilentAudio = () => {
+  //         return new Promise((resolve) => {
+  //           const silentAudio = document.getElementById('ios-audio-unlock');
+  //           if (silentAudio) {
+  //             console.log('[iOS] Playing silent audio to unlock iOS audio');
+  //
+  //             // Set up event handlers
+  //             const onEnded = () => {
+  //               console.log('[iOS] Silent audio ended, proceeding with actual audio');
+  //               silentAudio.removeEventListener('ended', onEnded);
+  //               silentAudio.removeEventListener('error', onError);
+  //               resolve();
+  //             };
+  //
+  //             const onError = (error) => {
+  //               console.error('[iOS] Silent audio error, proceeding anyway', error);
+  //               silentAudio.removeEventListener('ended', onEnded);
+  //               silentAudio.removeEventListener('error', onError);
+  //               resolve();
+  //             };
+  //
+  //             // Add event listeners
+  //             silentAudio.addEventListener('ended', onEnded);
+  //             silentAudio.addEventListener('error', onError);
+  //
+  //             // Reset the audio element to ensure it can be played again
+  //             silentAudio.currentTime = 0;
+  //
+  //             // Play the audio
+  //             silentAudio.play()
+  //               .then(() => {
+  //                 console.log('[iOS] Silent audio playing');
+  //               })
+  //               .catch(err => {
+  //                 console.error('[iOS] Failed to play silent audio:', err);
+  //                 silentAudio.removeEventListener('ended', onEnded);
+  //                 silentAudio.removeEventListener('error', onError);
+  //                 resolve(); // Continue anyway
+  //               });
+  //
+  //             // Set a timeout in case onended doesn't fire
+  //             setTimeout(() => {
+  //               console.log('[iOS] Silent audio timeout, proceeding anyway');
+  //               silentAudio.removeEventListener('ended', onEnded);
+  //               silentAudio.removeEventListener('error', onError);
+  //               resolve();
+  //             }, 500);
+  //           } else {
+  //             console.warn('[iOS] Silent audio element not found, proceeding anyway');
+  //             resolve();
+  //           }
+  //         });
+  //       };
+  //
+  //       // Play silent audio first, then the actual audio
+  //       await playSilentAudio();
+  //       console.log('[iOS] Using Tone.js for iOS playback');
+  //       // playAudioWithTone(localUrl, dialogueId, dialogue); // Need to get URL differently now
+  //     } else {
+  //       // For non-iOS, continue using the existing approach
+  //       console.log('[Desktop] Using standard Web Audio API');
+  //       // Try to play using the audio element first
+  //       // const elementSuccess = playAudioWithElement(localUrl, dialogueId, dialogue); // Need to get URL differently now
+  //
+  //       // If audio element fails, use Tone.js as fallback
+  //       // if (!elementSuccess) {
+  //       //   playAudioWithTone(localUrl, dialogueId, dialogue); // Need to get URL differently now
+  //       // }
+  //     }
+  //   } catch (err) {
+  //     console.error('Failed to set up narration:', err);
+  //   }
+  // }, [isIOS, playAudioWithElement, playAudioWithTone]);
 
-      console.log('Creating new audio instance for:', dialogueId);
-      
-      // Always use local audio files to avoid CORS issues
-      const localUrl = getAudioUrl(`${dialogueId}.mp3`);
-      console.log('Using local audio URL to avoid CORS:', localUrl);
-
-      // For iOS, ensure audio is unlocked before playing
-      if (isIOS) {
-        console.log('[iOS] Preparing for iOS playback');
-        
-        // Play silent audio first to unlock iOS audio
-        const playSilentAudio = () => {
-          return new Promise((resolve) => {
-            const silentAudio = document.getElementById('ios-audio-unlock');
-            if (silentAudio) {
-              console.log('[iOS] Playing silent audio to unlock iOS audio');
-              
-              // Set up event handlers
-              const onEnded = () => {
-                console.log('[iOS] Silent audio ended, proceeding with actual audio');
-                silentAudio.removeEventListener('ended', onEnded);
-                silentAudio.removeEventListener('error', onError);
-                resolve();
-              };
-              
-              const onError = (error) => {
-                console.error('[iOS] Silent audio error, proceeding anyway', error);
-                silentAudio.removeEventListener('ended', onEnded);
-                silentAudio.removeEventListener('error', onError);
-                resolve();
-              };
-              
-              // Add event listeners
-              silentAudio.addEventListener('ended', onEnded);
-              silentAudio.addEventListener('error', onError);
-              
-              // Reset the audio element to ensure it can be played again
-              silentAudio.currentTime = 0;
-              
-              // Play the audio
-              silentAudio.play()
-                .then(() => {
-                  console.log('[iOS] Silent audio playing');
-                })
-                .catch(err => {
-                  console.error('[iOS] Failed to play silent audio:', err);
-                  silentAudio.removeEventListener('ended', onEnded);
-                  silentAudio.removeEventListener('error', onError);
-                  resolve(); // Continue anyway
-                });
-              
-              // Set a timeout in case onended doesn't fire
-              setTimeout(() => {
-                console.log('[iOS] Silent audio timeout, proceeding anyway');
-                silentAudio.removeEventListener('ended', onEnded);
-                silentAudio.removeEventListener('error', onError);
-                resolve();
-              }, 500);
-            } else {
-              console.warn('[iOS] Silent audio element not found, proceeding anyway');
-              resolve();
-            }
-          });
-        };
-        
-        // Play silent audio first, then the actual audio
-        await playSilentAudio();
-        console.log('[iOS] Using Tone.js for iOS playback');
-        playAudioWithTone(localUrl, dialogueId, dialogue);
-      } else {
-        // For non-iOS, continue using the existing approach
-        console.log('[Desktop] Using standard Web Audio API');
-        // Try to play using the audio element first
-        const elementSuccess = playAudioWithElement(localUrl, dialogueId, dialogue);
-        
-        // If audio element fails, use Tone.js as fallback
-        if (!elementSuccess) {
-          playAudioWithTone(localUrl, dialogueId, dialogue);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to set up narration:', err);
-    }
-  }, [isIOS, playAudioWithElement, playAudioWithTone]);
-
-  // REFINED Function to play an audio file directly from its path
-  const playAudioFile = useCallback(async (filePath) => {
+  // Create a stable reference for playAudioFile
+  const playAudioFileRef = useRef(async (filePath) => {
     if (!filePath) {
       return;
     }
@@ -704,12 +725,13 @@ export function AudioProvider({ children }) {
 
 
       // Determine playback method based on iOS or fallback logic
-      if (isIOS) {
+      const isIOSDevice = isIOS; // Capture current value to avoid closure issues
+      if (isIOSDevice) {
         // playAudioWithTone creates its own element and connects analyzer
-        playAudioWithTone(url, filePath, tempDialogueInfo); // Use filePath as ID
+        playAudioWithToneRef.current(url, filePath, tempDialogueInfo); // Use filePath as ID
       } else {
         // playAudioWithElement uses audioElementRef and calls connectAnalyzerToAudio
-        const elementSuccess = playAudioWithElement(url, filePath, tempDialogueInfo); // Use filePath as ID
+        const elementSuccess = playAudioWithElementRef.current(url, filePath, tempDialogueInfo); // Use filePath as ID
         if (!elementSuccess) {
            // Fallback could be added here if needed
         }
@@ -721,8 +743,12 @@ export function AudioProvider({ children }) {
       setCurrentTrack(null);
       setCurrentDialogue(null);
     }
-
-  }, [isIOS, playAudioWithElement, playAudioWithTone, connectAnalyzerToAudio]); // Added connectAnalyzerToAudio dependency
+  });
+  
+  // Wrapper function to maintain API compatibility
+  const playAudioFile = useCallback((filePath) => {
+    return playAudioFileRef.current(filePath);
+  }, []); // No dependencies needed since we're using refs
   
   // Function to stop playback
   const stopNarration = useCallback(() => {
@@ -785,7 +811,7 @@ export function AudioProvider({ children }) {
 
   return (
     <AudioContext.Provider value={{
-      playNarration,
+      // playNarration, // Removed as the function is commented out
       stopNarration,
       handleNarrationEnd,
       getAudioInstance,
