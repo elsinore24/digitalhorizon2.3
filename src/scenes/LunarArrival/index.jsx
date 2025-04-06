@@ -12,10 +12,10 @@ import styles from './LunarArrival.module.scss'
 
 const LunarArrival = ({ dataPerceptionMode }) => {
   const { gameState, visitScene } = useGameState()
-  const { preloadAudioFile, isIOS, playAudioFile, isPlaying } = useAudio(); // Import playAudioFile and isPlaying
+  const { isIOS, playAudioFile, isPlaying } = useAudio(); // Remove pauseAudio, resumeAudio (no longer needed here)
   const [showEnter, setShowEnter] = useState(true);
   const [activeNarrativeId, setActiveNarrativeId] = useState(null); // State for the narrative reader
-  const [immediatePlaybackNeeded, setImmediatePlaybackNeeded] = useState(false); // State for immediate playback
+  // Revert: Remove immediatePlaybackNeeded state
 
   useEffect(() => {
     if (!gameState) return
@@ -31,18 +31,11 @@ const LunarArrival = ({ dataPerceptionMode }) => {
   const handleEnter = () => {
     setShowEnter(false);
     
-    // For iOS, directly trigger audio context initialization and preload
-    if (isIOS) {
-      // Get the narrative audio path (assuming it's always moon_dialogue for this scene)
-      const narrativeAudioPath = 'audio/narration/moon_dialogue.mp3'; // Or fetch from config if dynamic
-      
-      // Pre-load the audio file but don't play yet
-      preloadAudioFile(narrativeAudioPath);
-      
-      // Set a flag to play as soon as possible in NarrativeReader
-      setImmediatePlaybackNeeded(true);
-      console.log('[LunarArrival] iOS detected, preloading audio and setting immediate playback flag.');
-    }
+    // Trigger narrative loading via useEffect by setting activeNarrativeId
+    // setActiveNarrativeId('moon_dialogue'); // Let useEffect handle this based on showEnter
+
+    // No special iOS handling needed here anymore.
+    // The NarrativeReader will handle the programmatic click on iOS.
   };
 
   if (!gameState) return null
@@ -78,20 +71,35 @@ const LunarArrival = ({ dataPerceptionMode }) => {
           </div>
 
           {/* Render NarrativeReader conditionally based on activeNarrativeId */}
-          {activeNarrativeId && <NarrativeReader narrativeId={activeNarrativeId} dataPerceptionMode={dataPerceptionMode} immediatePlaybackNeeded={immediatePlaybackNeeded} setImmediatePlaybackNeeded={setImmediatePlaybackNeeded} />}
-          
+          {activeNarrativeId && <NarrativeReader narrativeId={activeNarrativeId} dataPerceptionMode={dataPerceptionMode} />}
+          {/* Revert: Remove immediatePlaybackNeeded props */}
+
           {/* Fallback Button for iOS if audio doesn't start automatically */}
-          {!showEnter && isIOS && !isPlaying && activeNarrativeId && (
+          {/* Fallback Button - Show always on iOS after entering */}
+          {!showEnter && isIOS && (
             <button
-              className={styles.directPlayButton} // Add appropriate styling
+              style={{ // Basic inline styling for visibility
+                position: 'fixed',
+                bottom: '80px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                padding: '10px 20px',
+                zIndex: 10000, // Ensure it's visible
+                backgroundColor: 'rgba(0, 255, 255, 0.7)',
+                color: 'black',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
               onClick={() => {
                 // Direct play attempt
                 console.log('[LunarArrival] Fallback button clicked, attempting direct play.');
-                const audioPath = `audio/narration/${activeNarrativeId}.mp3`; // Assuming mp3 format
+                // Use the correct audio path for the fallback button as well
+                const audioPath = 'audio/narration/lunar_arrival_intro.mp3';
                 playAudioFile(audioPath);
               }}
             >
-              Start Audio
+              Start Audio (Fallback)
             </button>
           )}
         </>

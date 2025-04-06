@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import useAudio from '../../hooks/useAudio';
 import styles from './NarrativeReader.module.scss';
 
-const NarrativeReader = ({ narrativeId, dataPerceptionMode, immediatePlaybackNeeded, setImmediatePlaybackNeeded }) => { // Add new props
+const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Remove props
   const [narrativeData, setNarrativeData] = useState(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -18,7 +18,8 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode, immediatePlaybackNee
   const [isAutoPageTurnEnabled, setIsAutoPageTurnEnabled] = useState(true);
   const [imageVisible, setImageVisible] = useState(false);
   const audioInstanceRef = useRef(null); // Ref to store the audio instance
-  // const { playAudio } = useAudio(); // Placeholder for audio hook usage
+  const playPauseButtonRef = useRef(null); // Ref for the play/pause button
+  const initialPlayTriggeredRef = useRef(false); // Ref to track if initial play was triggered
 
   // Effect to fetch narrative data and start audio
   useEffect(() => {
@@ -54,14 +55,21 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode, immediatePlaybackNee
         }
         const data = await response.json();
         setNarrativeData(data);
-        // Don't automatically play audio here if immediatePlaybackNeeded is true,
-        // let the other useEffect handle it.
-        if (!immediatePlaybackNeeded && data.audio) {
-          console.log('[NarrativeReader] Playing audio normally on fetch.');
-          playAudioFile(data.audio); // Use the path from the JSON data
-        } else if (immediatePlaybackNeeded && data.audio) {
-          console.log('[NarrativeReader] Immediate playback needed, deferring to useEffect.');
-        } else if (!data.audio) {
+        // Trigger audio playback using the narrativeId to construct the correct path
+        // The audio files are stored in public/audio/narration/ with the narrativeId as filename
+        // Revert: Always try to play audio on fetch (unless it's iOS and handled by handleEnter timeout)
+        // We rely on the AudioContext to handle the potential delay/pending state.
+        if (data.audio) {
+           // The playAudioFile call might be deferred by handleEnter on iOS
+           // For non-iOS or subsequent loads, this should play directly.
+           // Let AudioContext handle the actual playback logic based on its state.
+           // playAudioFile(data.audio); // Removed direct call here, handleEnter handles initial iOS play
+           console.log('[NarrativeReader] Narrative fetched, audio path:', data.audio);
+           // Always attempt to load the audio file when narrative data is fetched.
+           // The actual playback start might be deferred or handled by the programmatic click.
+           console.log('[NarrativeReader] Narrative fetched, loading audio:', data.audio);
+           playAudioFile(data.audio);
+        } else {
           console.warn(`Narrative ${narrativeId} is missing the 'audio' property in its JSON data.`);
         }
         
@@ -77,7 +85,7 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode, immediatePlaybackNee
 
     fetchNarrative();
   // Re-add playAudioFile dependency since it's used in the effect
-  }, [narrativeId, playAudioFile, immediatePlaybackNeeded]); // Add immediatePlaybackNeeded dependency
+  }, [narrativeId, playAudioFile]); // Revert: Remove immediatePlaybackNeeded dependency
 
   // Effect to trigger image fade-in
   useEffect(() => {
@@ -91,32 +99,34 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode, immediatePlaybackNee
     }
   }, [narrativeData]); // Depend on narrativeData
 
-  // Effect to handle immediate playback after initial gesture on iOS
+  // Effect to programmatically click Play/Pause on initial iOS load
   useEffect(() => {
-    // If we have narrative data and the immediatePlaybackNeeded flag is true
-    if (narrativeData && immediatePlaybackNeeded) {
-      console.log('[NarrativeReader] Immediate playback useEffect triggered.');
-      // Try to play audio immediately
-      if (narrativeData.audio) {
-        // Use a small timeout to ensure DOM is ready and context might be running
-        const playbackTimeout = setTimeout(() => {
-          console.log('[NarrativeReader] Attempting immediate playback via timeout.');
-          playAudioFile(narrativeData.audio);
-          // Reset the flag after attempting playback
-          if (setImmediatePlaybackNeeded) {
-             setImmediatePlaybackNeeded(false);
-          }
-        }, 50); // 50ms delay, adjust if needed
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    // Trigger only once on iOS when narrative data is loaded and button ref exists
+    if (isIOS && narrativeData && playPauseButtonRef.current && !initialPlayTriggeredRef.current) {
+      console.log('[NarrativeReader] iOS detected, narrative loaded. Attempting programmatic click on Play/Pause.');
+      
+      // Set flag immediately to prevent re-triggering
+      initialPlayTriggeredRef.current = true;
 
-        return () => clearTimeout(playbackTimeout); // Cleanup timeout
-      } else {
-         // Reset the flag even if there's no audio
-         if (setImmediatePlaybackNeeded) {
-            setImmediatePlaybackNeeded(false);
-         }
-      }
+      // Use a short timeout to ensure the button is fully rendered and interactive
+      const clickTimeout = setTimeout(() => {
+        if (playPauseButtonRef.current) {
+          console.log('[NarrativeReader] Triggering click on Play/Pause button ref.');
+          playPauseButtonRef.current.click(); // Simulate click
+        } else {
+          console.warn('[NarrativeReader] Play/Pause button ref was null during timeout.');
+        }
+      }, 100); // 100ms delay, adjust if needed
+
+      return () => clearTimeout(clickTimeout); // Cleanup timeout
     }
-  }, [narrativeData, immediatePlaybackNeeded, playAudioFile, setImmediatePlaybackNeeded]); // Add dependencies
+  }, [narrativeData]); // Depend only on narrativeData to trigger after load
+
+  // Reset the trigger flag if the narrative changes
+  useEffect(() => {
+    initialPlayTriggeredRef.current = false;
+  }, [narrativeId]);
   // Define handleTimeUpdate using useCallback before the effect
   const handleTimeUpdate = useCallback(() => {
     const audioInstance = audioInstanceRef.current; // Use the ref here
@@ -263,9 +273,9 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode, immediatePlaybackNee
                 Next
               </button>
 
-              {/* Play/Pause Button */}
+              {/* Play/Pause Button with Ref */}
               {narrativeData && ( // Render when narrative is loaded
-                 <button onClick={handlePlayPause}>
+                 <button ref={playPauseButtonRef} onClick={handlePlayPause}>
                    {isPausedByUser ? 'Resume' : 'Pause'}
                  </button>
               )}

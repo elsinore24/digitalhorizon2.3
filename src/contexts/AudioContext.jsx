@@ -512,27 +512,20 @@ export function AudioProvider({ children }) {
 
           // Initial mute state is handled by the masterGainNodeRef, no need to set on element
 
-          // Start HTML5 Audio playback only if context is running
-          console.log('[iOS Web Audio] Attempting HTML5 Audio playback');
-          if (audioContextRef.current && audioContextRef.current.state === 'running') {
-            iosAudioElement.play()
-              .then(() => {
-                console.log('[iOS Web Audio] HTML5 Audio playing successfully');
-                setIsPlaying(true);
-                setCurrentTrack(dialogueId);
-              })
-              .catch(err => {
-                console.error('[iOS Web Audio] HTML5 Audio play error:', err);
-                // Attempt cleanup even on play error
-                cleanup();
-              });
-          } else {
-             console.warn('[iOS Web Audio] Audio context not running. Storing playback request.');
-             setPendingPlayback({ url, dialogueId, dialogue, isTone: true }); // Store details for later playback (mark as Tone for iOS)
-             audioContextRef.current?.resume(); // Attempt to resume context again
-             setIsPlaying(false); // Ensure isPlaying is false if context isn't ready
-             // No cleanup needed here, just prevent playback attempt
+          // --- MODIFICATION START: Prevent automatic play on iOS ---
+          console.log('[iOS Web Audio] Setup complete. Audio loaded but NOT starting automatically.');
+          // We will rely on user interaction (programmatic click or fallback button) to start playback.
+          // Set state to indicate loading is done, but not playing yet.
+          setIsPlaying(false); // Explicitly set to false initially
+          setCurrentTrack(dialogueId); // Set track ID so fallback button condition might be met
+          
+          // Store details in case context wasn't running and needs pending playback later
+          if (!audioContextRef.current || audioContextRef.current.state !== 'running') {
+             console.warn('[iOS Web Audio] Audio context not running during setup. Storing playback request.');
+             setPendingPlayback({ url, dialogueId, dialogue, isTone: true });
+             audioContextRef.current?.resume();
           }
+          // --- MODIFICATION END ---
 
           // Set up stop handler for the HTML5 element
           iosAudioElement.onended = () => {
