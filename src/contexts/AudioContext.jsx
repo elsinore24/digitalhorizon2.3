@@ -343,6 +343,7 @@ export function AudioProvider({ children }) {
     
     try {
       audioElementRef.current.src = url;
+      audioRef.current = audioElementRef.current; // Ensure getAudioInstance returns the correct element
       audioElementRef.current.onloadeddata = () => {
         console.log('Audio loaded:', dialogueId);
         setCurrentDialogue(dialogue);
