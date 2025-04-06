@@ -87,62 +87,73 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Accept dat
       setImageVisible(false); // Reset if narrative is cleared
     }
   }, [narrativeData]); // Depend on narrativeData
+  // Define handleTimeUpdate using useCallback before the effect
+  const handleTimeUpdate = useCallback(() => {
+    const audioInstance = audioInstanceRef.current; // Use the ref here
+    // Check audioInstance exists before accessing properties
+    if (!audioInstance || !narrativeData || !isAutoPageTurnEnabled || isPausedByUser) return;
+
+    const currentTime = audioInstance.currentTime;
+    let newPageIndex = 0;
+
+    // Ensure pages exist before iterating
+    if (!narrativeData.pages) return;
+
+    // Find the latest page whose timestamp is less than or equal to the current time
+    for (let i = narrativeData.pages.length - 1; i >= 0; i--) {
+      // Ensure timestamp exists and is a number
+      if (typeof narrativeData.pages[i]?.timestamp === 'number' && narrativeData.pages[i].timestamp <= currentTime) {
+        newPageIndex = i;
+        break;
+      }
+    }
+
+    // Update the page index if it's different from the current one
+    setCurrentPageIndex(prevIndex => {
+      if (newPageIndex !== prevIndex) {
+        // console.log(`Time: ${currentTime.toFixed(2)}s, Auto-turning to page: ${newPageIndex + 1}`);
+        return newPageIndex;
+      }
+      return prevIndex; // No change needed
+    });
+  }, [narrativeData, isAutoPageTurnEnabled, isPausedByUser, setCurrentPageIndex]); // Dependencies for useCallback
+
   // Effect for handling audio time updates and auto page turning
   useEffect(() => {
-    if (!isPlaying || !narrativeData || !isAutoPageTurnEnabled || isPausedByUser) {
-      // If not playing, no data, auto-turn disabled, or paused by user, do nothing with time updates
-      // We might still want to clean up the listener if isPlaying becomes false
-      if (!isPlaying && audioInstanceRef.current) {
-         audioInstanceRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-      }
-      return;
-    }
-
-    // Ensure pages have timestamps
-    if (!narrativeData.pages || !narrativeData.pages.every(p => typeof p.timestamp === 'number')) {
-      console.warn("Narrative pages are missing timestamps. Auto page turning disabled.");
-      return;
-    }
-
+    // Get the audio instance *once* when the effect runs or dependencies change
     const audioInstance = getAudioInstance();
     audioInstanceRef.current = audioInstance; // Store instance in ref
 
-    const handleTimeUpdate = () => {
-      if (!audioInstance || !narrativeData || !isAutoPageTurnEnabled || isPausedByUser) return;
-
-      const currentTime = audioInstance.currentTime;
-      let newPageIndex = 0;
-
-      // Find the latest page whose timestamp is less than or equal to the current time
-      for (let i = narrativeData.pages.length - 1; i >= 0; i--) {
-        if (narrativeData.pages[i].timestamp <= currentTime) {
-          newPageIndex = i;
-          break;
-        }
+    if (!isPlaying || !narrativeData || !isAutoPageTurnEnabled || isPausedByUser || !audioInstance) {
+      // If not playing, no data, auto-turn disabled, paused by user, or no audio instance, clean up listener if needed
+      if (audioInstance) { // Check if we have an instance to remove listener from
+         // Use the stable handleTimeUpdate from useCallback
+         audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
       }
-
-      // Update the page index if it's different from the current one
-      setCurrentPageIndex(prevIndex => {
-        if (newPageIndex !== prevIndex) {
-          // console.log(`Time: ${currentTime.toFixed(2)}s, Auto-turning to page: ${newPageIndex + 1}`);
-          return newPageIndex;
-        }
-        return prevIndex; // No change needed
-      });
-    };
-
-    if (audioInstance) {
-      // console.log("Adding timeupdate listener");
-      audioInstance.addEventListener('timeupdate', handleTimeUpdate);
-
-      // Cleanup function
-      return () => {
-        // console.log("Removing timeupdate listener");
-        audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
-        // Don't nullify audioInstanceRef here, might be needed elsewhere
-      };
+      return; // Exit effect
     }
-  }, [isPlaying, narrativeData, isAutoPageTurnEnabled, isPausedByUser, getAudioInstance, setCurrentPageIndex]);
+
+    // Ensure pages have timestamps (moved check after getting audioInstance)
+    if (!narrativeData.pages || !narrativeData.pages.every(p => typeof p.timestamp === 'number')) {
+      console.warn("Narrative pages are missing timestamps. Auto page turning disabled.");
+      return; // Exit effect
+    }
+
+    // Add the listener using the stable handleTimeUpdate
+    // console.log("Adding timeupdate listener");
+    audioInstance.addEventListener('timeupdate', handleTimeUpdate);
+
+    // Cleanup function also uses the stable handleTimeUpdate
+    return () => {
+      // console.log("Removing timeupdate listener");
+      // Check if audioInstance exists before removing listener
+      if (audioInstance) {
+         audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
+      }
+      // Don't nullify audioInstanceRef here, might be needed elsewhere
+    };
+    // Updated dependencies: include the stable handleTimeUpdate
+  }, [isPlaying, narrativeData, isAutoPageTurnEnabled, isPausedByUser, getAudioInstance, handleTimeUpdate]);
 
   const handleNextPage = () => {
     if (narrativeData && currentPageIndex < narrativeData.pages.length - 1) {
@@ -223,7 +234,7 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Accept dat
               </button>
 
               {/* Play/Pause Button */}
-              {isPlaying && ( // Only show if audio context thinks it's playing
+              {narrativeData && ( // Render when narrative is loaded
                  <button onClick={handlePlayPause}>
                    {isPausedByUser ? 'Resume' : 'Pause'}
                  </button>
