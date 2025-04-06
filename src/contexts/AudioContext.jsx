@@ -24,7 +24,8 @@ export function AudioProvider({ children }) {
   const analyzerRef = useRef(null)
   const mediaStreamSourceRef = useRef(null)
   const masterGainNodeRef = useRef(null); // Add ref for master gain
-  const [audioInitialized, setAudioInitialized] = useState(false)
+  const [audioInitialized, setAudioInitialized] = useState(false);
+  const [pendingPlayback, setPendingPlayback] = useState(null); // State for deferred playback { url, dialogueId, dialogue, isTone }
   
   // Check if we're on iOS
   useEffect(() => {
@@ -324,8 +325,9 @@ export function AudioProvider({ children }) {
         audioContextRef.current = null;
       }
     };
-  }, [isIOS]);
+  }, [isIOS, initAudioContext, tryOscillatorUnlock]); // Added dependencies
 
+  // Effect to handle pending playback when context resumes
   // Play audio using HTML5 Audio element
   const playAudioWithElement = useCallback((url, dialogueId, dialogue) => {
     if (!audioElementRef.current) return false;
@@ -339,17 +341,23 @@ export function AudioProvider({ children }) {
         // Connect analyzer to the audio element
         connectAnalyzerToAudio();
         
-        // Play the audio
-        audioElementRef.current.play()
-          .then(() => {
-            console.log('Audio playing:', dialogueId);
-            setIsPlaying(true);
-            setCurrentTrack(dialogueId);
-          })
-          .catch(err => {
-            console.error('Error playing audio:', err);
-            return false;
-          });
+        // Play the audio only if context is running
+        if (audioContextRef.current && audioContextRef.current.state === 'running') {
+          audioElementRef.current.play()
+            .then(() => {
+              console.log('Audio playing:', dialogueId);
+              setIsPlaying(true);
+              setCurrentTrack(dialogueId);
+            })
+            .catch(err => {
+              console.error('Error playing audio:', err);
+              // Consider resetting state here if play fails
+            });
+        } else {
+          console.warn('Audio context not running. Storing playback request.');
+          setPendingPlayback({ url, dialogueId, dialogue, isTone: false }); // Store details for later playback
+          setIsPlaying(false); // Ensure isPlaying is false if context isn't ready
+        }
       };
       
       audioElementRef.current.onended = () => {
@@ -446,19 +454,26 @@ export function AudioProvider({ children }) {
 
           // Initial mute state is handled by the masterGainNodeRef, no need to set on element
 
-          // Start HTML5 Audio playback
-          console.log('[iOS Web Audio] Starting HTML5 Audio playback');
-          iosAudioElement.play()
-            .then(() => {
-              console.log('[iOS Web Audio] HTML5 Audio playing successfully');
-              setIsPlaying(true);
-              setCurrentTrack(dialogueId);
-            })
-            .catch(err => {
-              console.error('[iOS Web Audio] HTML5 Audio play error:', err);
-              // Attempt cleanup even on play error
-              cleanup();
-            });
+          // Start HTML5 Audio playback only if context is running
+          console.log('[iOS Web Audio] Attempting HTML5 Audio playback');
+          if (audioContextRef.current && audioContextRef.current.state === 'running') {
+            iosAudioElement.play()
+              .then(() => {
+                console.log('[iOS Web Audio] HTML5 Audio playing successfully');
+                setIsPlaying(true);
+                setCurrentTrack(dialogueId);
+              })
+              .catch(err => {
+                console.error('[iOS Web Audio] HTML5 Audio play error:', err);
+                // Attempt cleanup even on play error
+                cleanup();
+              });
+          } else {
+             console.warn('[iOS Web Audio] Audio context not running. Storing playback request.');
+             setPendingPlayback({ url, dialogueId, dialogue, isTone: true }); // Store details for later playback (mark as Tone for iOS)
+             setIsPlaying(false); // Ensure isPlaying is false if context isn't ready
+             // No cleanup needed here, just prevent playback attempt
+          }
 
           // Set up stop handler for the HTML5 element
           iosAudioElement.onended = () => {
@@ -516,6 +531,40 @@ export function AudioProvider({ children }) {
       return false;
     }
   }, [isMuted]); // Add isMuted dependency
+
+  // Effect to handle pending playback when context resumes
+  useEffect(() => {
+    const context = audioContextRef.current;
+    if (!context) return;
+
+    const handleContextStateChange = () => {
+      if (context.state === 'running' && pendingPlayback) {
+        console.log('Audio context is running, attempting pending playback:', pendingPlayback.dialogueId || pendingPlayback.url);
+        // Call the appropriate playback function based on the stored flag
+        // NOTE: We need to access the functions via refs or ensure they are stable if defined outside
+        // For simplicity here, assuming they are accessible in scope after reordering
+        if (pendingPlayback.isTone) {
+          playAudioWithTone(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
+        } else {
+          playAudioWithElement(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
+        }
+        // Clear the pending playback state
+        setPendingPlayback(null);
+      }
+    };
+
+    context.addEventListener('statechange', handleContextStateChange);
+
+    // Initial check in case the context is already running when this effect mounts
+    handleContextStateChange();
+
+    return () => {
+      context.removeEventListener('statechange', handleContextStateChange);
+    };
+  // Dependencies: pendingPlayback state. The playback functions are now defined above,
+  // so they are stable references within this effect's closure.
+  }, [pendingPlayback]); // Removed playAudioWithElement and playAudioWithTone from dependencies
+
   
   // Main function to play narration audio
   const playNarration = useCallback(async (dialogueId) => {
@@ -617,8 +666,15 @@ export function AudioProvider({ children }) {
     if (!filePath) {
       return;
     }
-    // Construct URL assuming filePath is relative to public root
-    const url = `/${filePath}`;
+
+    initAudioContext(); // Ensure context is initialized and try resuming if suspended
+    let url;
+    // Check if filePath is a data URI
+    if (filePath.startsWith('data:audio/')) {
+      url = filePath; // Use the data URI directly
+    } else {
+      url = `/${filePath}`; // Construct URL assuming filePath is relative to public root
+    }
 
     // Placeholder info - might not be needed if playback functions don't rely on it
     const tempDialogueInfo = { speaker: '', text: '' };
