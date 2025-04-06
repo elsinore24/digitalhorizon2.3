@@ -128,6 +128,17 @@ export function AudioProvider({ children }) {
       oscillator.stop(0.001);
       setAudioInitialized(true);
       console.log('[iOS Audio Unlock] iOS audio initialized with oscillator');
+      // --- Immediately play pending audio after successful unlock ---
+      if (pendingPlayback) {
+        console.log('[iOS Audio Unlock] Oscillator unlock successful, attempting pending playback:', pendingPlayback.dialogueId || pendingPlayback.url);
+        if (pendingPlayback.isTone) {
+          playAudioWithToneRef.current(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
+        } else {
+          playAudioWithElementRef.current(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
+        }
+        setPendingPlayback(null);
+      }
+      // --- End pending playback check ---
     } catch (err) {
       console.error('[iOS Audio Unlock] Failed oscillator method:', err);
     }
@@ -271,6 +282,17 @@ export function AudioProvider({ children }) {
                         oscillator.stop(0.001);
                         
                         console.log('[iOS Audio Unlock] iOS audio initialized');
+                        // --- Immediately play pending audio after successful unlock ---
+                        if (pendingPlayback) {
+                          console.log('[iOS Audio Unlock] Silent audio unlock successful, attempting pending playback:', pendingPlayback.dialogueId || pendingPlayback.url);
+                          if (pendingPlayback.isTone) {
+                            playAudioWithToneRef.current(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
+                          } else {
+                            playAudioWithElementRef.current(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
+                          }
+                          setPendingPlayback(null);
+                        }
+                        // --- End pending playback check ---
                       })
                       .catch(err => {
                         console.error('[iOS Audio Unlock] Failed to play silent audio:', err);
