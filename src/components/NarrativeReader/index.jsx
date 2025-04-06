@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import useAudio from '../../hooks/useAudio';
 import styles from './NarrativeReader.module.scss';
 
-const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Accept dataPerceptionMode prop
+const NarrativeReader = ({ narrativeId, dataPerceptionMode, immediatePlaybackNeeded, setImmediatePlaybackNeeded }) => { // Add new props
   const [narrativeData, setNarrativeData] = useState(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,11 +54,14 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Accept dat
         }
         const data = await response.json();
         setNarrativeData(data);
-        // Trigger audio playback using the narrativeId to construct the correct path
-        // The audio files are stored in public/audio/narration/ with the narrativeId as filename
-        if (data.audio) {
+        // Don't automatically play audio here if immediatePlaybackNeeded is true,
+        // let the other useEffect handle it.
+        if (!immediatePlaybackNeeded && data.audio) {
+          console.log('[NarrativeReader] Playing audio normally on fetch.');
           playAudioFile(data.audio); // Use the path from the JSON data
-        } else {
+        } else if (immediatePlaybackNeeded && data.audio) {
+          console.log('[NarrativeReader] Immediate playback needed, deferring to useEffect.');
+        } else if (!data.audio) {
           console.warn(`Narrative ${narrativeId} is missing the 'audio' property in its JSON data.`);
         }
         
@@ -74,7 +77,7 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Accept dat
 
     fetchNarrative();
   // Re-add playAudioFile dependency since it's used in the effect
-  }, [narrativeId, playAudioFile]); // Add playAudioFile back as dependency
+  }, [narrativeId, playAudioFile, immediatePlaybackNeeded]); // Add immediatePlaybackNeeded dependency
 
   // Effect to trigger image fade-in
   useEffect(() => {
@@ -87,6 +90,33 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Accept dat
       setImageVisible(false); // Reset if narrative is cleared
     }
   }, [narrativeData]); // Depend on narrativeData
+
+  // Effect to handle immediate playback after initial gesture on iOS
+  useEffect(() => {
+    // If we have narrative data and the immediatePlaybackNeeded flag is true
+    if (narrativeData && immediatePlaybackNeeded) {
+      console.log('[NarrativeReader] Immediate playback useEffect triggered.');
+      // Try to play audio immediately
+      if (narrativeData.audio) {
+        // Use a small timeout to ensure DOM is ready and context might be running
+        const playbackTimeout = setTimeout(() => {
+          console.log('[NarrativeReader] Attempting immediate playback via timeout.');
+          playAudioFile(narrativeData.audio);
+          // Reset the flag after attempting playback
+          if (setImmediatePlaybackNeeded) {
+             setImmediatePlaybackNeeded(false);
+          }
+        }, 50); // 50ms delay, adjust if needed
+
+        return () => clearTimeout(playbackTimeout); // Cleanup timeout
+      } else {
+         // Reset the flag even if there's no audio
+         if (setImmediatePlaybackNeeded) {
+            setImmediatePlaybackNeeded(false);
+         }
+      }
+    }
+  }, [narrativeData, immediatePlaybackNeeded, playAudioFile, setImmediatePlaybackNeeded]); // Add dependencies
   // Define handleTimeUpdate using useCallback before the effect
   const handleTimeUpdate = useCallback(() => {
     const audioInstance = audioInstanceRef.current; // Use the ref here

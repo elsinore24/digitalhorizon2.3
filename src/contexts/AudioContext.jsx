@@ -27,11 +27,21 @@ export function AudioProvider({ children }) {
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [pendingPlayback, setPendingPlayback] = useState(null); // State for deferred playback { url, dialogueId, dialogue, isTone }
   
-  // Check if we're on iOS
+  // Check if we're on iOS and get version
+  const [iOSVersion, setIOSVersion] = useState(0);
+  const [isNewerIOS, setIsNewerIOS] = useState(false);
+
   useEffect(() => {
-    const iOSDetected = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
-    setIsIOS(iOSDetected)
-    console.log('iOS device detected:', iOSDetected)
+    const iOSDetected = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    setIsIOS(iOSDetected);
+    console.log('iOS device detected:', iOSDetected);
+    if (iOSDetected) {
+      const versionMatch = navigator.userAgent.match(/OS (\d+)_/i);
+      const version = versionMatch ? parseInt(versionMatch[1], 10) : 0;
+      setIOSVersion(version);
+      setIsNewerIOS(version >= 15);
+      console.log(`iOS Version: ${version}, Is Newer iOS (>=15): ${version >= 15}`);
+    }
   }, [])
 
   const getAudioInstance = useCallback(() => {
@@ -250,45 +260,76 @@ export function AudioProvider({ children }) {
               console.log('[iOS Audio Unlock] Initializing audio on iOS');
               
               // Play the silent audio to unlock iOS audio
+              // Enhanced unlockAudio function
               const unlockAudio = () => {
                 const silentAudio = document.getElementById('ios-audio-unlock');
-                if (silentAudio) {
-                  console.log('[iOS Audio Unlock] Playing silent audio to unlock iOS audio');
+                if (silentAudio && audioContextRef.current) {
+                  console.log('[iOS Audio Unlock] Attempting multiple unlock methods...');
                   
-                  // Try to play the silent audio
-                  try {
-                    silentAudio.play()
-                      .then(() => {
-                        console.log('[iOS Audio Unlock] Silent audio played successfully');
-                        setAudioInitialized(true);
-                        setIOSAudioUnlocked(true);
-                        
-                        // Also play a short oscillator sound to ensure Web Audio API is unlocked
+                  // Play multiple times with different methods
+                  Promise.all([
+                    // Method 1: Play the silent audio
+                    silentAudio.play().catch(err => console.warn('[iOS Audio Unlock] Silent audio play method failed:', err)),
+                    
+                    // Method 2: Use an oscillator
+                    new Promise(resolve => {
+                      try {
                         const oscillator = audioContextRef.current.createOscillator();
                         oscillator.frequency.value = 1;
                         oscillator.connect(audioContextRef.current.destination);
                         oscillator.start(0);
-                        oscillator.stop(0.001);
-                        
-                        console.log('[iOS Audio Unlock] iOS audio initialized');
-                      })
-                      .catch(err => {
-                        console.error('[iOS Audio Unlock] Failed to play silent audio:', err);
-                        
-                        // Fall back to oscillator method
-                        console.log('[iOS Audio Unlock] Falling back to oscillator method');
-                        tryOscillatorUnlock();
-                      });
-                  } catch (e) {
-                    console.error('[iOS Audio Unlock] Exception playing silent audio:', e);
-                    // Fall back to oscillator method
-                    tryOscillatorUnlock();
-                  }
+                        oscillator.stop(audioContextRef.current.currentTime + 0.001); // Use context time
+                        resolve();
+                      } catch (e) {
+                        console.warn('[iOS Audio Unlock] Oscillator method failed:', e);
+                        resolve(); // Resolve even if failed
+                      }
+                    }),
+                    
+                    // Method 3: Use a buffer source
+                    new Promise(resolve => {
+                      try {
+                        const buffer = audioContextRef.current.createBuffer(1, 1, 22050); // Minimal buffer
+                        const source = audioContextRef.current.createBufferSource();
+                        source.buffer = buffer;
+                        source.connect(audioContextRef.current.destination);
+                        source.start(0);
+                        resolve();
+                      } catch (e) {
+                        console.warn('[iOS Audio Unlock] Buffer source method failed:', e);
+                        resolve(); // Resolve even if failed
+                      }
+                    })
+                  ])
+                  .then(() => {
+                    console.log('[iOS Audio Unlock] Multiple unlock methods attempted.');
+                    // Check context state *after* attempts
+                    if (audioContextRef.current.state === 'running') {
+                       console.log('[iOS Audio Unlock] AudioContext is now running.');
+                       setAudioInitialized(true);
+                       setIOSAudioUnlocked(true);
+                    } else {
+                       console.warn('[iOS Audio Unlock] AudioContext still not running after unlock attempts.');
+                       // Optionally try resuming again or rely on statechange listener
+                       audioContextRef.current.resume().catch(e => console.error("Final resume attempt failed", e));
+                    }
+
+                    // Check for pending playback immediately regardless of final state,
+                    // as the statechange listener might handle it if still suspended.
+                    if (pendingPlayback) {
+                      console.log('[iOS Audio Unlock] Processing pending playback immediately after unlock attempt.');
+                      // Use the ref to call the handler, passing current context and pending state
+                      handleContextStateChangeRef.current(audioContextRef.current, pendingPlayback);
+                    }
+                  })
+                  .catch(err => {
+                    // This catch might not be reached if individual promises handle errors
+                    console.error('[iOS Audio Unlock] Error during Promise.all for unlock methods:', err);
+                  });
                 } else {
-                  console.error('[iOS Audio Unlock] Silent audio element not found');
-                  
-                  // Fall back to oscillator method
-                  tryOscillatorUnlock();
+                   console.error('[iOS Audio Unlock] Silent audio element or AudioContext not found for unlock.');
+                   // Fallback or alternative strategy if needed
+                   tryOscillatorUnlock(); // Attempt original fallback
                 }
               };
               
@@ -752,6 +793,53 @@ export function AudioProvider({ children }) {
   const playAudioFile = useCallback((filePath) => {
     return playAudioFileRef.current(filePath);
   }, []); // No dependencies needed since we're using refs
+
+  // Create a stable reference for preloadAudioFile
+  const preloadAudioFileRef = useRef((filePath) => {
+    if (!filePath) return;
+
+    initAudioContext(); // Ensure context is initialized
+
+    // For iOS, create a special preload mechanism
+    if (isIOS) {
+      console.log('[iOS Preload] Preloading audio:', filePath);
+      // Create a temporary audio element for preloading
+      const preloadElement = document.createElement('audio');
+      preloadElement.id = `preload-${filePath.replace(/[^a-zA-Z0-9]/g, '-')}`; // Unique ID
+      preloadElement.src = `/${filePath}`;
+      preloadElement.preload = 'auto'; // Important for loading
+      preloadElement.style.display = 'none';
+      document.body.appendChild(preloadElement);
+
+      preloadElement.load(); // Explicitly call load
+
+      // Optional: Add listeners to check loading status
+      preloadElement.oncanplaythrough = () => {
+        console.log(`[iOS Preload] Can play through: ${filePath}`);
+        // Optionally remove the element after load? Or keep for faster play?
+        // if (preloadElement.parentNode) {
+        //   preloadElement.parentNode.removeChild(preloadElement);
+        // }
+      };
+      preloadElement.onerror = (e) => {
+        console.error(`[iOS Preload] Error preloading ${filePath}:`, e);
+        if (preloadElement.parentNode) {
+          preloadElement.parentNode.removeChild(preloadElement);
+        }
+      };
+
+      // Note: The plan suggested adding a touch listener here to play.
+      // However, the play logic should remain within playAudioFile triggered
+      // by the NarrativeReader after the initial gesture. Preloading just
+      // ensures the audio is fetched and potentially decoded.
+    }
+  });
+
+  // Wrapper function for preloadAudioFile
+  const preloadAudioFile = useCallback((filePath) => {
+    preloadAudioFileRef.current(filePath);
+  }, []); // No dependencies needed since we're using refs
+
   
   // Function to stop playback
   const stopNarration = useCallback(() => {
