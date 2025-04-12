@@ -256,22 +256,20 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Re
         {/* Existing Narrative Box */}
         {narrativeData && ( // Conditionally render narrative box as well
           <div className={styles.narrativeBox}>
+            {/* Add Arrow Buttons */}
+            <button className={styles.prevArrow} onClick={handlePrevPage} disabled={isFirstPage}>&lt;</button>
+            <button className={styles.nextArrow} onClick={handleNextPage} disabled={isLastPage}>&gt;</button>
+
             <div className={styles.narrativeText}>
               {currentPageText}
             </div>
             <div className={styles.navigation}>
-              {/* Previous Button */}
-              <button onClick={handlePrevPage} disabled={isFirstPage}>
-                Previous
-              </button>
+              {/* Previous Button Removed */}
 
               {/* Page Info */}
               <span>Page {currentPageIndex + 1} of {narrativeData.pages.length}</span>
 
-              {/* Next Button */}
-              <button onClick={handleNextPage} disabled={isLastPage}>
-                Next
-              </button>
+              {/* Next Button Removed */}
 
               {/* Play/Pause Button with Ref */}
               {narrativeData && ( // Render when narrative is loaded

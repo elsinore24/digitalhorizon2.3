@@ -20,6 +20,48 @@
   display: flex;
   flex-direction: column;
   gap: 15px;
+  position: relative; // Added for arrow positioning context
+}
+
+/* Styles for the new arrow buttons */
+.prevArrow,
+.nextArrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(var(--color-primary-rgb), 0.5); // Semi-transparent background
+  color: white;
+  border: 1px solid rgba(var(--color-primary-rgb), 0.8);
+  border-radius: 50%; // Make them circular
+  width: 30px;       // Fixed size
+  height: 30px;      // Fixed size
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+  z-index: 1; // Ensure they are above the text box content if needed
+
+  &:hover:not(:disabled) {
+    background-color: rgba(var(--color-primary-rgb), 0.8); // Darken on hover
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: rgba(100, 100, 100, 0.5); // Greyed out background when disabled
+    border-color: rgba(150, 150, 150, 0.8);
+  }
+}
+
+.prevArrow {
+  left: -15px; // Position slightly outside the box to the left
+}
+
+.nextArrow {
+  right: -15px; // Position slightly outside the box to the right
 }
 
 .narrativeText {
