@@ -1,14 +1,38 @@
 {
   "mcpServers": {
-    "brave-search": {
-      "command": "npx",
+    "github.com/alexander-zuev/supabase-mcp-server": {
+      "command": "C:\\Users\\Daniel\\.local\\bin\\supabase-mcp-server.exe",
+      "args": [],
+      "env": {
+        "SUPABASE_URL": "https://zhhnrhkvrakfyaslfhpf.supabase.co",
+        "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpoaG5yaGt2cmFrZnlhc2xmaHBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5Mjc3MDYsImV4cCI6MjA1NzUwMzcwNn0.B6JKCZ9SYDBM1lefeU4XzLmeZdFd2NEwGr8rGOskLWg",
+        "SUPABASE_SERVICE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpoaG5yaGt2cmFrZnlhc2xmaHBmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MTkyNzcwNiwiZXhwIjoyMDU3NTAzNzA2fQ.xCYCWuiYlpUgfISmGOpRLWytjdA9RhJwxTcsq6Mx--Y",
+        "SUPABASE_PROJECT_REF": "zhhnrhkvrakfyaslfhpf",
+        "SUPABASE_REGION": "us-west-1"
+      },
+      "disabled": false,
+      "autoApprove": []
+    },
+    "github.com/modelcontextprotocol/servers/tree/main/src/brave-search": {
+      "command": "C:\\WINDOWS\\system32\\cmd.exe",
       "args": [
-        "-y",
-        "@modelcontextprotocol/server-brave-search"
+        "/c",
+        "npx -y @modelcontextprotocol/server-brave-search"
       ],
       "env": {
         "BRAVE_API_KEY": "BSAbAqrgQ12dIhATQrGefd9GcW0pDGR"
-      }
+      },
+      "disabled": false,
+      "autoApprove": []
+    },
+    "github.com/zcaceres/fetch-mcp": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\Daniel\\Documents\\Cline\\MCP\\fetch-mcp\\dist\\index.js"
+      ],
+      "env": {},
+      "disabled": false,
+      "autoApprove": []
     }
   }
 }
