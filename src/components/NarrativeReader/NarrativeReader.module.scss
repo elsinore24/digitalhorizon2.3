@@ -70,7 +70,9 @@
   font-family: 'Arial', sans-serif; /* Consider a more readable font for longer text */
   white-space: pre-wrap; /* Preserve line breaks in the text */
   text-align: left;
-  min-height: 130px; /* Adjusted minimum height */
+  height: 150px; /* Fixed height */
+  overflow-y: auto; /* Enable vertical scrolling if content overflows */
+  padding-right: 5px; /* Add padding to prevent scrollbar overlap */
 }
 
 .navigation {
