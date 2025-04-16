@@ -2,17 +2,19 @@ import { createContext, useState, useCallback } from 'react'
 
 const initialState = {
   currentScene: 'LunarArrival',
+  introPhase: 'initial', // Add intro phase state
   dataPerceptionActive: false,
   player: {
     location: 'lunar_surface',
-    stabilityMeter: 100
+    stabilityMeter: 100,
+    flashbackChoice: null // Add field to store flashback choice
   },
   discoveredEchoes: [],
   dialogueHistory: [],
   puzzlesSolved: [],
   inventory: [],
-  scenesVisited: [] // Add scenesVisited array
-}
+  scenesVisited: []
+};
 
 export const GameStateContext = createContext(null)
 
@@ -66,7 +68,13 @@ export function GameStateProvider({ children }) {
         ? prev.scenesVisited 
         : [...prev.scenesVisited, sceneId]
     }))
-  }, [])
+  }, []);
+
+  // Function to specifically update the intro phase
+  const setIntroPhase = useCallback((phase) => {
+    console.log(`[GameStateContext] Setting introPhase to: ${phase}`); // Log phase changes
+    setGameStateRaw(prev => ({ ...prev, introPhase: phase }));
+  }, []);
 
   const value = {
     gameState,
@@ -76,8 +84,9 @@ export function GameStateProvider({ children }) {
     addToInventory,
     recordDialogue,
     solvePuzzle,
-    visitScene
-  }
+    visitScene,
+    setIntroPhase // Expose the new function
+  };
 
   return (
     <GameStateContext.Provider value={value}>

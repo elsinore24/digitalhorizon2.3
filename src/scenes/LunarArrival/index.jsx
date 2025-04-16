@@ -1,109 +1,149 @@
-import { useState, useEffect } from 'react'
-import useGameState from '../../hooks/useGameState'
-import useAudio from '../../hooks/useAudio'
-import TemporalEcho from '../../components/TemporalEcho'
-import Scene3D from '../../components/Scene3D'
-import DataPerceptionOverlay from '../../components/DataPerceptionOverlay'
-// import ObjectiveTracker from '../../components/ObjectiveTracker' // Removed as per comment in original code
-// import DialogueSystem from '../../components/DialogueSystem' // Replaced by NarrativeReader
-import NarrativeReader from '../../components/NarrativeReader'; // Import the new component
-import { destinations } from '../../config/destinations' // Import the new config
-import styles from './LunarArrival.module.scss'
+import { useState, useEffect } from 'react';
+import useGameState from '../../hooks/useGameState';
+import useAudio from '../../hooks/useAudio';
+import TemporalEcho from '../../components/TemporalEcho';
+import Scene3D from '../../components/Scene3D';
+import DataPerceptionOverlay from '../../components/DataPerceptionOverlay';
+import NarrativeReader from '../../components/NarrativeReader';
+import RedAlertInterface from '../../components/RedAlertInterface'; // Import new component
+import FlashbackLabScene from '../../components/FlashbackLabScene'; // Import new component
+import IntroTransition from '../../components/IntroTransition'; // Import new component
+import ChoicePoint from '../../components/ChoicePoint'; // Import new component
+import { destinations } from '../../config/destinations';
+import styles from './LunarArrival.module.scss';
 
 const LunarArrival = ({ dataPerceptionMode }) => {
-  const { gameState, visitScene } = useGameState()
-  const { isIOS, playAudioFile, isPlaying } = useAudio(); // Remove pauseAudio, resumeAudio (no longer needed here)
-  const [showEnter, setShowEnter] = useState(true);
-  const [activeNarrativeId, setActiveNarrativeId] = useState(null); // State for the narrative reader
-  // Revert: Remove immediatePlaybackNeeded state
+  // Get introPhase and setIntroPhase from the context
+  const { gameState, visitScene, updateGameState, setIntroPhase } = useGameState();
+  // Access gameState.introPhase directly in conditionals below
+  const { isIOS, playAudioFile } = useAudio();
 
-  useEffect(() => {
-    if (!gameState) return
+  // Placeholder for lab background image path
+  const labBackgroundImage = '/images/lab_background.png'; // TODO: Replace with actual path if different
+  // Placeholder for flashback narrative ID
+  const flashbackNarrativeId = 'flashback_intro'; // TODO: Replace with actual narrative ID
+  // Removed old useEffect that triggered moon_dialogue
 
-    const isFirstVisit = !gameState.scenesVisited?.includes('lunar_arrival')
-    if (isFirstVisit && !showEnter) {
-      // Trigger the NarrativeReader instead of playing narration directly
-      setActiveNarrativeId('moon_dialogue');
-      visitScene('lunar_arrival');
-    }
-  }, [gameState, visitScene, showEnter]); // Removed playNarration from dependencies
+  // --- Intro Sequence Handlers ---
 
   const handleEnter = () => {
-    setShowEnter(false);
-    
-    // Trigger narrative loading via useEffect by setting activeNarrativeId
-    // setActiveNarrativeId('moon_dialogue'); // Let useEffect handle this based on showEnter
-
-    // No special iOS handling needed here anymore.
-    // The NarrativeReader will handle the programmatic click on iOS.
+    console.log('Entering Digital Horizons - Triggering Red Alert');
+    setIntroPhase('redAlert');
+    // Potentially mark scene visited here if needed
+    visitScene('lunar_arrival'); // Mark arrival if appropriate
   };
 
-  if (!gameState) return null
+  const handleAttemptRealign = () => {
+    console.log('Attempting Neural Realignment - Triggering Transition');
+    setIntroPhase('transitioning');
+  };
+
+  const handleTransitionComplete = () => {
+    console.log('Transition Complete - Triggering Flashback Narrative');
+    setIntroPhase('flashbackNarrative');
+  };
+
+  const handleNarrativeComplete = () => {
+    console.log('Flashback Narrative Complete - Triggering Choice Point');
+    setIntroPhase('flashbackChoice');
+  };
+
+  const handleFlashbackChoice = (choice) => {
+    console.log(`Flashback Choice Selected: ${choice}`);
+    // Update game state with the choice
+    updateGameState({ player: { ...gameState.player, flashbackChoice: choice } });
+    // Transition to the main game view using context function
+    setIntroPhase('mainGame');
+  };
+
+  // Add logging to check gameState and introPhase
+  console.log('[LunarArrival] Rendering. GameState:', gameState);
+  if (!gameState) {
+    console.log('[LunarArrival] gameState is null/undefined, returning null.');
+    return null;
+  }
+  console.log(`[LunarArrival] Rendering with introPhase: ${gameState.introPhase}`);
+
+  // --- Render Logic ---
+
+  // Render the 3D background unconditionally
+  // Render overlays based on introPhase
 
   return (
     <div className={styles.sceneContainer}>
-      {showEnter ? (
-        <button className={styles.enterButton} onClick={handleEnter}>
-          Enter Digital Horizons
-        </button>
-      ) : (
-        <>
-          {/* Old background divs removed */}
+      {/* Always render the 3D background */}
+      <Scene3D dataPerceptionMode={dataPerceptionMode} />
 
-          <Scene3D dataPerceptionMode={dataPerceptionMode} />
+      {/* --- Overlays based on Intro Phase --- */}
+
+      {gameState.introPhase === 'initial' && (
+        // Removed undefined className from wrapper div
+        <div style={{ zIndex: 1200, position: 'relative' }}> {/* Keep zIndex, ensure positioning context */}
+          <button className={styles.enterButton} onClick={handleEnter}>
+            Enter Digital Horizons
+          </button>
+        </div>
+      )}
+
+      {gameState.introPhase === 'redAlert' && (
+        <RedAlertInterface onAttemptRealign={handleAttemptRealign} />
+      )}
+
+      {gameState.introPhase === 'transitioning' && (
+        <IntroTransition onComplete={handleTransitionComplete} />
+      )}
+
+      {/* Render Lab Scene background during narrative and choice phases */}
+      {(gameState.introPhase === 'flashbackNarrative' || gameState.introPhase === 'flashbackChoice') && (
+        <FlashbackLabScene />
+      )}
+
+      {/* Render Narrative Reader during its phase */}
+      {gameState.introPhase === 'flashbackNarrative' && (
+        <NarrativeReader
+          narrativeId={flashbackNarrativeId} // Use placeholder ID
+          backgroundImageUrl={labBackgroundImage} // Use placeholder image
+          onComplete={handleNarrativeComplete}
+          // Pass dataPerceptionMode if NarrativeReader needs to be hidden by it later
+          // dataPerceptionMode={dataPerceptionMode} // Example: Keep narrative visible even in data mode during flashback
+        />
+      )}
+
+      {/* Render Choice Point during its phase */}
+      {gameState.introPhase === 'flashbackChoice' && (
+        <ChoicePoint onChoiceSelected={handleFlashbackChoice} />
+      )}
+
+
+      {/* --- Main Game Elements (Rendered when intro is complete) --- */}
+      {gameState.introPhase === 'mainGame' && (
+        <>
+          {/* Data Perception Overlay */}
           <DataPerceptionOverlay active={dataPerceptionMode} />
-          
-          {/* Removed ObjectiveTracker as it's tied to old fragment system */}
-          
+
+          {/* Temporal Echoes (only visible in data perception mode) */}
           <div className={styles.environment}>
             {dataPerceptionMode && (
               <div className={styles.dataElements}>
-                {/* Map over destinations config to render TemporalEcho components */}
                 {destinations.map((dest) => (
                   <TemporalEcho
                     key={dest.id}
-                    id={dest.id} // Pass id for potential future use, key is essential
-                    destinationConfig={dest} // Pass the whole config object
+                    id={dest.id}
+                    destinationConfig={dest}
                   />
                 ))}
               </div>
             )}
           </div>
 
-          {/* Render NarrativeReader conditionally based on activeNarrativeId */}
-          {activeNarrativeId && <NarrativeReader narrativeId={activeNarrativeId} dataPerceptionMode={dataPerceptionMode} />}
-          {/* Revert: Remove immediatePlaybackNeeded props */}
+          {/* Potentially add other main game UI elements here */}
+          {/* Example: Maybe a default narrative starts after the choice? */}
+          {/* {activeNarrativeId && <NarrativeReader narrativeId={activeNarrativeId} ... />} */}
 
-          {/* Fallback Button for iOS if audio doesn't start automatically */}
-          {/* Fallback Button - Show always on iOS after entering */}
-          {!showEnter && isIOS && (
-            <button
-              style={{ // Basic inline styling for visibility
-                position: 'fixed',
-                bottom: '80px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                padding: '10px 20px',
-                zIndex: 10000, // Ensure it's visible
-                backgroundColor: 'rgba(0, 255, 255, 0.7)',
-                color: 'black',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
-              }}
-              onClick={() => {
-                // Direct play attempt
-                console.log('[LunarArrival] Fallback button clicked, attempting direct play.');
-                // Use the correct audio path for the fallback button as well
-                const audioPath = 'audio/narration/lunar_arrival_intro.mp3';
-                playAudioFile(audioPath);
-              }}
-            >
-              Start Audio (Fallback)
-            </button>
-          )}
         </>
       )}
+
+      {/* Removed old iOS fallback button */}
     </div>
   )
 }

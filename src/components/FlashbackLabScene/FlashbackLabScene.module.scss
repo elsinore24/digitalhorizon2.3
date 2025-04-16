@@ -1,0 +1,113 @@
+.labContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* Push elements to top and bottom */
+  align-items: center;
+  padding: 20px;
+  font-family: 'Orbitron', sans-serif; /* Example futuristic font */
+  color: #e0f2f7; /* Light cyan */
+  background-color: rgba(10, 25, 40, 0.6); /* Semi-transparent dark blue overlay */
+  z-index: 900; /* Below RedAlert/Transition, above Scene3D */
+  box-sizing: border-box;
+  pointer-events: none; /* Allow clicks to pass through unless elements below enable them */
+}
+
+.header {
+  width: 100%;
+  text-align: center;
+  margin-top: 60px; /* Added margin to push header down */
+  margin-bottom: 20px; /* Add some space below header */
+  background-color: rgba(0, 10, 20, 0.7);
+  padding: 5px 0;
+  border-bottom: 1px solid #4dd0e1; /* Cyan border */
+  animation: fadeOutHeader 1s ease-out 3s forwards; /* Fade out after 3s delay */
+}
+
+.headerText {
+  font-size: 1.5em;
+  color: #80deea; /* Lighter cyan */
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.monitorSection {
+  width: 90%;
+  max-width: 800px;
+  display: flex;
+  justify-content: space-around;
+  background-color: rgba(0, 10, 20, 0.7);
+  padding: 15px;
+  border: 1px solid #4dd0e1; /* Cyan border */
+  border-radius: 5px;
+  margin-top: auto; /* Push monitors towards the bottom */
+  margin-bottom: 20px; /* Space above bottom edge */
+}
+
+.monitor {
+  width: 30%;
+  text-align: left;
+  padding: 10px;
+  border-left: 2px solid #4dd0e1;
+}
+
+.monitorLabel {
+  font-size: 0.9em;
+  color: #b2ebf2; /* Very light cyan */
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.monitorValue {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+.valueOptimal {
+  color: #a5d6a7; /* Light green */
+}
+
+.valueSeparate {
+  color: #80cbc4; /* Teal */
+}
+
+.valueHigh {
+ color: #a5d6a7; /* Light green */
+}
+
+/* Add specific styles for the consciousness spectrum if needed */
+.consciousnessIndicators {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.indicator {
+  width: 40%;
+  height: 8px;
+  border-radius: 4px;
+}
+
+.indicatorHuman {
+  background-color: #80cbc4; /* Teal */
+}
+
+.indicatorAI {
+  background-color: #4dd0e1; /* Cyan */
+}
+
+/* Animation for header fade out */
+@keyframes fadeOutHeader {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    pointer-events: none; /* Prevent interaction after fading */
+  }
+}

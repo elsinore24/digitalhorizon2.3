@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import LunarArrival from '../scenes/LunarArrival'
-import DataPerceptionOverlay from './DataPerceptionOverlay'
-import StabilityMeter from './StabilityMeter'
-import NarrationIndicator from './NarrationIndicator'
-import MuteButton from './MuteButton' // Import the new component
+import DataPerceptionOverlay from './DataPerceptionOverlay';
+// import StabilityMeter from './StabilityMeter'; // Remove old import
+import TopStatusBar from './TopStatusBar'; // Import new component
+import NarrationIndicator from './NarrationIndicator';
+import MuteButton from './MuteButton';
 import useGameState from '../hooks/useGameState'
 import useAuth from '../hooks/useAuth'
 import useDatabase from '../hooks/useDatabase'
 import styles from './GameContainer.module.scss'
 
 export default function GameContainer() {
-  const { gameState, toggleDataPerception } = useGameState()
+  const { gameState, toggleDataPerception } = useGameState(); // Get introPhase from context
   const { user } = useAuth()
   const { loadGame } = useDatabase()
 
@@ -38,16 +39,22 @@ export default function GameContainer() {
       <Routes>
         <Route path="/" element={<LunarArrival dataPerceptionMode={gameState.dataPerceptionActive} />} />
       </Routes>
+      {/* Conditionally render TopStatusBar during specific intro phases */}
+      {(gameState.introPhase === 'flashbackNarrative' || gameState.introPhase === 'flashbackChoice') && (
+        <TopStatusBar />
+      )}
+
+      {/* Render other UI elements */}
       <DataPerceptionOverlay active={gameState.dataPerceptionActive} />
-      {gameState.dataPerceptionActive && <StabilityMeter />} {/* Only show when active */}
+      {/* Removed StabilityMeter rendering */}
       <NarrationIndicator />
-      <button 
-        className={styles.perceptionToggle} 
+      <button
+        className={styles.perceptionToggle}
         onClick={toggleDataPerception}
       >
         Toggle Data Perception [Tab]
       </button>
-      <MuteButton /> {/* Add the MuteButton here */}
+      <MuteButton />
     </div>
   )
 }

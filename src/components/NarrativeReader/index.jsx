@@ -2,7 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import useAudio from '../../hooks/useAudio';
 import styles from './NarrativeReader.module.scss';
 
-const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Remove props
+const NarrativeReader = ({
+  narrativeId,
+  dataPerceptionMode,
+  backgroundImageUrl = "/front_pic/moon.png", // Default background
+  onComplete,
+}) => {
   const [narrativeData, setNarrativeData] = useState(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -160,40 +165,89 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Re
 
   // Effect for handling audio time updates and auto page turning
   useEffect(() => {
-    // Get the audio instance *once* when the effect runs or dependencies change
     const audioInstance = getAudioInstance();
-    audioInstanceRef.current = audioInstance; // Store instance in ref
+    audioInstanceRef.current = audioInstance;
 
     if (!isPlaying || !narrativeData || !isAutoPageTurnEnabled || isPausedByUser || !audioInstance) {
-      // If not playing, no data, auto-turn disabled, paused by user, or no audio instance, clean up listener if needed
-      if (audioInstance) { // Check if we have an instance to remove listener from
-         // Use the stable handleTimeUpdate from useCallback
-         audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
+      if (audioInstance) {
+        audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
       }
-      return; // Exit effect
+      return;
     }
 
-    // Ensure pages have timestamps (moved check after getting audioInstance)
     if (!narrativeData.pages || !narrativeData.pages.every(p => typeof p.timestamp === 'number')) {
       console.warn("Narrative pages are missing timestamps. Auto page turning disabled.");
-      return; // Exit effect
+      // Don't add listener if timestamps are missing
+    } else {
+      // Add timeupdate listener only if timestamps exist
+      audioInstance.addEventListener('timeupdate', handleTimeUpdate);
     }
 
-    // Add the listener using the stable handleTimeUpdate
-    // console.log("Adding timeupdate listener");
-    audioInstance.addEventListener('timeupdate', handleTimeUpdate);
-
-    // Cleanup function also uses the stable handleTimeUpdate
+    // Cleanup function
     return () => {
-      // console.log("Removing timeupdate listener");
-      // Check if audioInstance exists before removing listener
       if (audioInstance) {
-         audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
+        audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
       }
-      // Don't nullify audioInstanceRef here, might be needed elsewhere
     };
-    // Updated dependencies: include the stable handleTimeUpdate
   }, [isPlaying, narrativeData, isAutoPageTurnEnabled, isPausedByUser, getAudioInstance, handleTimeUpdate]);
+
+
+  // Effect for handling narrative completion
+  useEffect(() => {
+    const audioInstance = audioInstanceRef.current;
+    // Check if onComplete is actually a function before proceeding
+    if (!audioInstance || !narrativeData || typeof onComplete !== 'function') {
+      return; // Exit if no audio, data, or valid callback
+    }
+
+    const handleAudioEnd = () => {
+      console.log('[NarrativeReader] Audio ended.');
+      // Check if we are on the last page when audio ends
+      // Use a local variable inside the handler to get the latest index
+      const currentIdx = currentPageIndex;
+      const isActuallyLastPage = currentIdx === narrativeData.pages.length - 1;
+
+      if (isActuallyLastPage) {
+        console.log('[NarrativeReader] Audio ended on last page. Calling onComplete.');
+        onComplete();
+      } else {
+         console.log(`[NarrativeReader] Audio ended, but not on last page (current: ${currentIdx}, total: ${narrativeData.pages.length}).`);
+         // Optionally, force navigation to last page here if desired,
+         // or let the user navigate manually. For now, just call onComplete if on last page.
+      }
+    };
+
+    // Howler uses 'end', HTMLAudioElement uses 'ended'
+    // Assuming useAudio provides a Howler instance or similar event emitter
+    const eventName = 'end';
+    // Ensure addEventListener/removeEventListener exist on the instance
+    if (typeof audioInstance.addEventListener === 'function' && typeof audioInstance.removeEventListener === 'function') {
+       audioInstance.addEventListener(eventName, handleAudioEnd);
+       // console.log(`[NarrativeReader] Added ${eventName} listener.`);
+    } else if (typeof audioInstance.on === 'function' && typeof audioInstance.off === 'function') {
+       // Handle cases where it might use .on/.off (like Howler v2)
+       audioInstance.on(eventName, handleAudioEnd);
+       // console.log(`[NarrativeReader] Added ${eventName} listener using .on()`);
+    } else {
+       console.warn('[NarrativeReader] Audio instance does not support standard event listeners (addEventListener/on). Cannot track end.');
+       return; // Cannot proceed without event listeners
+    }
+
+
+    return () => {
+      if (audioInstance) {
+        // console.log(`[NarrativeReader] Removing ${eventName} listener.`);
+        if (typeof audioInstance.removeEventListener === 'function') {
+           audioInstance.removeEventListener(eventName, handleAudioEnd);
+        } else if (typeof audioInstance.off === 'function') {
+           audioInstance.off(eventName, handleAudioEnd);
+        }
+      }
+    };
+    // Re-run if audio instance changes, narrative changes, or callback changes
+    // IMPORTANT: Do NOT add currentPageIndex here, as it would re-register the listener on every page turn.
+    // The check for the last page happens *inside* the handleAudioEnd callback.
+  }, [narrativeData, onComplete, getAudioInstance]); // Depend on getAudioInstance to get the correct instance
 
   const handleNextPage = () => {
     if (narrativeData && currentPageIndex < narrativeData.pages.length - 1) {
@@ -249,7 +303,7 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Re
         {/* NEW: Image Container */}
         {narrativeData && ( // Only show image container if there's a narrative
           <div className={`${styles.lunarImageContainer} ${imageVisible ? styles.fadeInActive : ''}`}>
-            <img src="/front_pic/moon.png" alt="Lunar surface" className={styles.lunarImage} />
+            <img src={backgroundImageUrl} alt="Narrative background" className={styles.lunarImage} />
           </div>
         )}
 

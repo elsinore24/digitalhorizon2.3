@@ -3,7 +3,7 @@ import GameContainer from './components/GameContainer'
 import DialogueDisplay from './components/DialogueDisplay'
 import AudioVisualizer from './components/AudioVisualizer'
 import { AudioProvider } from './contexts/AudioContext'
-import { GameStateProvider } from './contexts/GameStateContext'
+// import { GameStateProvider } from './contexts/GameStateContext'; // Removed - using Zustand hook now
 import { AuthProvider } from './contexts/AuthContext'
 import useAudio from './hooks/useAudio';
 import useGameState from './hooks/useGameState'; // Import useGameState
@@ -11,7 +11,11 @@ import useGameState from './hooks/useGameState'; // Import useGameState
 // Wrapper component to use hooks
 function AppContent() {
   const { isPlaying } = useAudio();
-  const { gameState } = useGameState(); // Get game state
+  const gameState = useGameState(state => state.gameState); // Select gameState from Zustand store
+  // Add a check in case gameState is initially undefined during hydration/setup
+  if (!gameState) {
+    return null; // Or a loading indicator
+  }
   
   return (
     <>
@@ -48,11 +52,11 @@ export default function App() {
   return (
     <AuthProvider>
       <Router>
-        <GameStateProvider>
+        {/* <GameStateProvider> Removed */}
           <AudioProvider>
             <AppContent />
           </AudioProvider>
-        </GameStateProvider>
+        {/* </GameStateProvider> Removed */}
       </Router>
     </AuthProvider>
   )

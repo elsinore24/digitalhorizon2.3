@@ -1,0 +1,61 @@
+.transitionContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000; /* Start with black */
+  color: #f00; /* Red text */
+  font-family: 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100; /* Highest z-index during transition */
+  overflow: hidden; /* Hide overflow during effects */
+  animation: backgroundStatic 0.1s infinite steps(2); /* Simple static effect */
+}
+
+.message {
+  font-size: 2em;
+  font-weight: bold;
+  text-align: center;
+  padding: 10px;
+  opacity: 0; /* Start hidden */
+  animation: fadeInOut 2s ease-in-out forwards; /* Fade in and stay */
+  text-shadow: 0 0 5px #f00;
+}
+
+/* Stagger the second message */
+.message:nth-child(2) {
+  animation-delay: 2s; /* Start after the first message fades in */
+}
+
+/* Simple static background effect */
+@keyframes backgroundStatic {
+  0% { background-color: #050505; }
+  50% { background-color: #000000; }
+  100% { background-color: #0a0a0a; }
+}
+
+/* Simple text fade in */
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 1; } /* Keep visible */
+  /* If you want it to fade out later, adjust 100% opacity and timing */
+}
+
+/* Add more complex glitch/fracture animations here later if needed */
+/* Example Glitch (very basic) */
+.glitchText {
+  animation: glitch 0.5s infinite alternate;
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); }
+  25% { transform: translate(-2px, 2px); color: #0ff; }
+  50% { transform: translate(2px, -2px); color: #ff0; }
+  75% { transform: translate(-1px, 1px); color: #f0f; }
+  100% { transform: translate(0); }
+}
