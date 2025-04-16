@@ -201,7 +201,7 @@ export default function AudioVisualizer() {
       if (!canvasRef.current) return
       const canvas = canvasRef.current
       // canvas.width = Math.floor(window.innerWidth / 2) // Let CSS handle width
-      canvas.height = 400 // Increased to match container height
+      canvas.height = 50 // Further reduced height
     }
     
     // Initial resize
@@ -218,7 +218,7 @@ export default function AudioVisualizer() {
     <canvas 
       ref={canvasRef} 
       className={styles.visualizer}
-      height="400"
+      height="50"
     />
   )
 }

@@ -1,0 +1,157 @@
+/* Basic styles for NarrativeReader - Adapt as needed */
+
+.narrativeContainer {
+  position: fixed; /* Or adjust positioning as needed */
+  bottom: 100px; /* Further increased bottom margin */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 800px; /* Match DialogueSystem or adjust */
+  z-index: 1000; /* Ensure visibility */
+  color: white; /* Default text color */
+}
+
+.narrativeBox {
+  background: transparent; /* Removed black background */
+  /* border: 1px solid var(--color-primary); Removed border */
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  position: relative; // Added for arrow positioning context
+}
+
+/* Styles for the new arrow buttons */
+.prevArrow,
+.nextArrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(var(--color-primary-rgb), 0.5); // Semi-transparent background
+  color: white;
+  border: 1px solid rgba(var(--color-primary-rgb), 0.8);
+  border-radius: 50%; // Make them circular
+  width: 30px;       // Fixed size
+  height: 30px;      // Fixed size
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+  z-index: 1; // Ensure they are above the text box content if needed
+
+  &:hover:not(:disabled) {
+    background-color: rgba(var(--color-primary-rgb), 0.8); // Darken on hover
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: rgba(100, 100, 100, 0.5); // Greyed out background when disabled
+    border-color: rgba(150, 150, 150, 0.8);
+  }
+}
+
+.prevArrow {
+  left: -15px; // Position slightly outside the box to the left
+}
+
+.nextArrow {
+  right: -15px; // Position slightly outside the box to the right
+}
+
+.narrativeText {
+  font-size: 18px; /* Match DialogueSystem or adjust */
+  line-height: 1.6;
+  font-family: 'Arial', sans-serif; /* Consider a more readable font for longer text */
+  white-space: pre-wrap; /* Preserve line breaks in the text */
+  text-align: left;
+  height: 150px; /* Fixed height */
+  overflow-y: auto; /* Enable vertical scrolling if content overflows */
+  padding-right: 5px; /* Add padding to prevent scrollbar overlap */
+}
+
+.navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  border-top: 1px solid rgba(var(--color-primary-rgb), 0.3);
+  padding-top: 15px;
+
+  button {
+    background-color: var(--color-primary);
+    color: black;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+
+    &:hover:not(:disabled) {
+      /* background-color: lighten(var(--color-primary), 10%); Replaced due to Sass error */
+      filter: brightness(1.1); /* Apply brightness filter on hover instead */
+    }
+
+    &:disabled {
+      background-color: #555;
+      color: #aaa;
+      cursor: not-allowed;
+    }
+  }
+
+  span {
+    font-size: 14px;
+    color: var(--color-secondary); /* Assuming a secondary color variable */
+  }
+}
+
+.loading,
+.error {
+  text-align: center;
+  font-style: italic;
+  color: var(--color-secondary);
+  padding: 20px;
+}
+
+.error {
+  color: red;
+  font-weight: bold;
+}
+/* Add these styles */
+.lunarImageContainer {
+  position: relative;
+  width: 90%;
+  max-width: 400px;
+  margin: 0 auto 20px auto;
+  opacity: 0;
+  transition: opacity 2s ease-in; // 2-second fade-in
+}
+
+.lunarImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+// Style to trigger the fade-in
+.fadeInActive {
+  opacity: 1;
+}
+
+// Ensure image container is also hidden when data perception mode is active
+.hidden .lunarImageContainer {
+   display: none;
+}
+
+
+// Class to explicitly hide the container
+.hidden {
+  display: none !important;
+}

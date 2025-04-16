@@ -5,15 +5,18 @@ import AudioVisualizer from './components/AudioVisualizer'
 import { AudioProvider } from './contexts/AudioContext'
 import { GameStateProvider } from './contexts/GameStateContext'
 import { AuthProvider } from './contexts/AuthContext'
-import useAudio from './hooks/useAudio'
+import useAudio from './hooks/useAudio';
+import useGameState from './hooks/useGameState'; // Import useGameState
 
 // Wrapper component to use hooks
 function AppContent() {
-  const { isPlaying } = useAudio()
+  const { isPlaying } = useAudio();
+  const { gameState } = useGameState(); // Get game state
   
   return (
     <>
-      {isPlaying && (
+      {/* Only show visualizer if playing AND data perception is OFF */}
+      {isPlaying && !gameState.dataPerceptionActive && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -21,19 +24,22 @@ function AppContent() {
           width: '100%',
           height: '100%',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          // alignItems: 'center', // Removed for top alignment
+          justifyContent: 'center', // Re-added for horizontal centering
+          paddingTop: '20px', // Keep vertical padding
+          // paddingLeft: '20px', // Removed, using justifyContent now
           zIndex: 9999, // Increased z-index to ensure it's above everything
           pointerEvents: 'none',
           background: 'rgba(0, 0, 0, 0.2)', // Semi-transparent background
         }}>
-          <div style={{ height: '400px' }}> {/* Removed width: 100% */}
+          <div style={{ height: '100px' }}> {/* Reduced height */}
             <AudioVisualizer />
           </div>
         </div>
       )}
       <GameContainer />
-      <DialogueDisplay />
+      {/* Render DialogueDisplay unconditionally, pass isHidden prop */}
+      <DialogueDisplay isHidden={gameState.dataPerceptionActive} />
     </>
   )
 }

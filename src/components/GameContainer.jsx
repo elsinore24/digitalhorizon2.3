@@ -4,6 +4,7 @@ import LunarArrival from '../scenes/LunarArrival'
 import DataPerceptionOverlay from './DataPerceptionOverlay'
 import StabilityMeter from './StabilityMeter'
 import NarrationIndicator from './NarrationIndicator'
+import MuteButton from './MuteButton' // Import the new component
 import useGameState from '../hooks/useGameState'
 import useAuth from '../hooks/useAuth'
 import useDatabase from '../hooks/useDatabase'
@@ -38,7 +39,7 @@ export default function GameContainer() {
         <Route path="/" element={<LunarArrival dataPerceptionMode={gameState.dataPerceptionActive} />} />
       </Routes>
       <DataPerceptionOverlay active={gameState.dataPerceptionActive} />
-      <StabilityMeter />
+      {gameState.dataPerceptionActive && <StabilityMeter />} {/* Only show when active */}
       <NarrationIndicator />
       <button 
         className={styles.perceptionToggle} 
@@ -46,6 +47,7 @@ export default function GameContainer() {
       >
         Toggle Data Perception [Tab]
       </button>
+      <MuteButton /> {/* Add the MuteButton here */}
     </div>
   )
 }
