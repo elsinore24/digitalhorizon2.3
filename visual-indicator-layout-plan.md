@@ -1,6 +1,6 @@
 # Visual Indicator Layout Adjustment Plan (Revised)
 
-**Goal:** Reposition indicators horizontally at the top, spread out, remove technical details, and significantly reduce size for mobile compatibility.
+**Goal:** Reposition indicators horizontally at the top, spread out, remove technical details, significantly reduce size for mobile compatibility, and diagnose/fix blurriness.
 
 **Revised Plan Details:**
 
@@ -40,6 +40,11 @@
         *   Reduce `height` for `.indicatorBarBase` (and related) (e.g., to `~8px`).
         *   Adjust `margin-top`/`margin-bottom` for `.indicatorBarBase`.
 
+5.  **Diagnose Overall Blurriness (CSS - `src/components/GameUIIndicators/IndicatorContainer.module.scss`):**
+    *   Temporarily comment out `backdrop-filter: blur(3px);` in `.indicatorWrapper`.
+    *   Temporarily comment out `filter: blur(4px);` in `.indicatorWrapper::before`.
+    *   Evaluate the visual result to determine if blur effects are the primary cause of indistinctness. Adjustments (keeping disabled, reducing blur, or focusing on fonts) will follow based on this diagnosis.
+
 **Visual Representation (Conceptual - Smaller):**
 
 ```mermaid
@@ -55,4 +60,4 @@ graph LR
 ```
 *(Note: Text abbreviated for diagram clarity)*
 
-**Implementation:** These changes will be implemented in `code` mode by modifying the three indicator JSX files and the two relevant SCSS files.
+**Implementation:** These changes will be implemented in `code` mode by modifying the three indicator JSX files and the two relevant SCSS files, starting with the diagnostic step.
