@@ -122,6 +122,13 @@
   }
 }
 
+/* Add this block for mobile adjustments */
+@media (max-width: 768px) {
+  .redAlertContainer {
+    padding-top: 5px; /* Reduce top padding significantly */
+  }
+}
+
 /* Keyframes */
 @keyframes pulse {
   0% { opacity: 1; }
