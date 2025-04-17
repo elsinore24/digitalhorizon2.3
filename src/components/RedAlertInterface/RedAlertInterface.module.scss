@@ -125,7 +125,8 @@
 /* Add this block for mobile adjustments */
 @media (max-width: 768px) {
   .redAlertContainer {
-    padding-top: 5px; /* Reduce top padding significantly */
+    justify-content: flex-start; /* Align content to the top on mobile */
+    padding-top: 5px; /* Keep small top padding */
   }
 }
 
