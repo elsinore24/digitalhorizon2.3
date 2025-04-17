@@ -247,5 +247,8 @@ export default function Scene3D({ dataPerceptionMode }) {
     })
   }, [dataPerceptionMode])
 
-  return <div ref={containerRef} className={styles.scene3d} />
+  return <div
+    ref={containerRef}
+    className={`${styles.scene3d} ${dataPerceptionMode ? styles.dataPerceptionActive : ''}`} // Add conditional class
+  />
 }

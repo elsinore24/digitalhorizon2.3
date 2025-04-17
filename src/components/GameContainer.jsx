@@ -24,8 +24,10 @@ export default function GameContainer() {
 
   useEffect(() => {
     const handleKeyPress = (e) => {
+      console.log('Key pressed:', e.key); // DEBUG LOG
       if (e.key === 'Tab') {
         e.preventDefault()
+        console.log('Tab pressed, calling toggleDataPerception'); // DEBUG LOG
         toggleDataPerception()
       }
     }
@@ -50,7 +52,10 @@ export default function GameContainer() {
       <NarrationIndicator />
       <button
         className={styles.perceptionToggle}
-        onClick={toggleDataPerception}
+        onClick={() => {
+          console.log('Toggle button clicked, calling toggleDataPerception'); // DEBUG LOG
+          toggleDataPerception();
+        }}
       >
         Toggle Data Perception [Tab]
       </button>

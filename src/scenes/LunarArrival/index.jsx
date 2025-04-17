@@ -66,9 +66,6 @@ const LunarArrival = ({ dataPerceptionMode }) => {
 
   // --- Render Logic ---
 
-  // Render the 3D background unconditionally
-  // Render overlays based on introPhase
-
   return (
     <div className={styles.sceneContainer}>
       {/* Always render the 3D background */}
@@ -93,7 +90,7 @@ const LunarArrival = ({ dataPerceptionMode }) => {
       {(gameState.introPhase === 'transitioning' || gameState.introPhase === 'flashbackNarrative' || gameState.introPhase === 'flashbackChoice') && (
         <FlashbackLabScene />
       )}
-      
+
       {/* Render IntroTransition in a separate portal div to isolate it from WebGL context */}
       {gameState.introPhase === 'transitioning' && (
         <div style={{
@@ -110,7 +107,7 @@ const LunarArrival = ({ dataPerceptionMode }) => {
       )}
 
       {/* Render Narrative Reader during its phase */}
-      {gameState.introPhase === 'flashbackNarrative' && (
+      {gameState.introPhase === 'flashbackNarrative' && !dataPerceptionMode && ( // <-- Hide if dataPerceptionMode is true
         <NarrativeReader
           narrativeId={flashbackNarrativeId} // Use placeholder ID
           backgroundImageUrl={labBackgroundImage} // Use placeholder image
@@ -125,32 +122,29 @@ const LunarArrival = ({ dataPerceptionMode }) => {
         <ChoicePoint onChoiceSelected={handleFlashbackChoice} />
       )}
 
+      {/* --- Data Perception Elements (Rendered based on dataPerceptionMode, NOT introPhase) --- */}
+      {/* Moved OUTSIDE the 'mainGame' check */}
+      <DataPerceptionOverlay active={dataPerceptionMode} />
+      <div className={styles.environment}>
+        {dataPerceptionMode && (
+          <div className={styles.dataElements}>
+            {destinations.map((dest) => (
+              <TemporalEcho
+                key={dest.id}
+                id={dest.id}
+                destinationConfig={dest}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* --- Main Game Elements (Rendered when intro is complete) --- */}
+      {/* --- Main Game Specific UI (Still rendered only when intro is complete) --- */}
       {gameState.introPhase === 'mainGame' && (
         <>
-          {/* Data Perception Overlay */}
-          <DataPerceptionOverlay active={dataPerceptionMode} />
-
-          {/* Temporal Echoes (only visible in data perception mode) */}
-          <div className={styles.environment}>
-            {dataPerceptionMode && (
-              <div className={styles.dataElements}>
-                {destinations.map((dest) => (
-                  <TemporalEcho
-                    key={dest.id}
-                    id={dest.id}
-                    destinationConfig={dest}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Potentially add other main game UI elements here */}
           {/* Example: Maybe a default narrative starts after the choice? */}
           {/* {activeNarrativeId && <NarrativeReader narrativeId={activeNarrativeId} ... />} */}
-
         </>
       )}
 

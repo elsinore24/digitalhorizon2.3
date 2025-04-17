@@ -20,7 +20,7 @@ function AppContent() {
   return (
     <>
       {/* Only show visualizer if playing AND data perception is OFF */}
-      {isPlaying && !gameState.dataPerceptionActive && (
+      {/* {isPlaying && !gameState.dataPerceptionActive && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -37,10 +37,10 @@ function AppContent() {
           background: 'rgba(0, 0, 0, 0.2)', // Semi-transparent background
         }}>
           <div style={{ height: '100px' }}> {/* Reduced height */}
-            <AudioVisualizer />
-          </div>
+            {/* <AudioVisualizer /> */}
+          {/* </div>
         </div>
-      )}
+      )} */}
       <GameContainer />
       {/* Render DialogueDisplay unconditionally, pass isHidden prop */}
       <DialogueDisplay isHidden={gameState.dataPerceptionActive} />

@@ -5,7 +5,7 @@
   cursor: pointer;
   transform-origin: center;
   transform: translate(-50%, -50%);
-  pointer-events: all;
+  pointer-events: none; // Temporarily disable for debugging
 }
 
 .core {

@@ -27,12 +27,12 @@ const DialogueSystem = () => {
         <div className={styles.dialogueHeader}>
           <span className={styles.speakerName}>{currentDialogue.speaker}</span>
           {/* Conditionally show visualizer container only if playing */}
-          {isPlaying && (
+          {/* {isPlaying && (
             <div className={styles.visualizerContainer}>
               <div className={styles.visualizerLabel}>AUDIO ANALYSIS</div>
               <AudioVisualizer />
             </div>
-          )}
+          )} */}
         </div>
         <div className={styles.dialogueText}>
           {displayedText}
