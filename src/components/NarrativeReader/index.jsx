@@ -288,11 +288,13 @@ const NarrativeReader = ({
     return null; // Or some placeholder if needed when no narrative is active
   }
 
-  // Ensure currentPageText is accessed safely, considering the new structure
-  const currentPageData = narrativeData.pages[currentPageIndex];
-  const currentPageText = currentPageData ? currentPageData.text : '';
+  // Safely access page data and text
+  const pagesExist = narrativeData && Array.isArray(narrativeData.pages) && narrativeData.pages.length > 0;
+  const currentPageData = pagesExist && narrativeData.pages[currentPageIndex] ? narrativeData.pages[currentPageIndex] : null;
+  const currentPageText = currentPageData ? currentPageData.text : 'Loading page...'; // Provide default text
+  const totalPages = pagesExist ? narrativeData.pages.length : 0;
   const isFirstPage = currentPageIndex === 0;
-  const isLastPage = currentPageIndex === narrativeData.pages.length - 1;
+  const isLastPage = pagesExist ? currentPageIndex === totalPages - 1 : true; // Default to true if no pages
 
   return (
     <div
@@ -321,7 +323,7 @@ const NarrativeReader = ({
               {/* Previous Button Removed */}
 
               {/* Page Info */}
-              <span>Page {currentPageIndex + 1} of {narrativeData.pages.length}</span>
+              <span>Page {currentPageIndex + 1} of {totalPages}</span>
 
               {/* Next Button Removed */}
 

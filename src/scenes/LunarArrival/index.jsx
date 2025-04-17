@@ -19,7 +19,7 @@ const LunarArrival = ({ dataPerceptionMode }) => {
   const { isIOS, playAudioFile } = useAudio();
 
   // Placeholder for lab background image path
-  const labBackgroundImage = '/images/lab_background.png'; // TODO: Replace with actual path if different
+  const labBackgroundImage = 'front_pic/lab.jpg'; // Corrected path and extension, removed leading slash
   // Placeholder for flashback narrative ID
   const flashbackNarrativeId = 'flashback_intro'; // TODO: Replace with actual narrative ID
   // Removed old useEffect that triggered moon_dialogue
@@ -89,13 +89,24 @@ const LunarArrival = ({ dataPerceptionMode }) => {
         <RedAlertInterface onAttemptRealign={handleAttemptRealign} />
       )}
 
-      {gameState.introPhase === 'transitioning' && (
-        <IntroTransition onComplete={handleTransitionComplete} />
-      )}
-
-      {/* Render Lab Scene background during narrative and choice phases */}
-      {(gameState.introPhase === 'flashbackNarrative' || gameState.introPhase === 'flashbackChoice') && (
+      {/* Render Lab Scene background during transition, narrative and choice phases */}
+      {(gameState.introPhase === 'transitioning' || gameState.introPhase === 'flashbackNarrative' || gameState.introPhase === 'flashbackChoice') && (
         <FlashbackLabScene />
+      )}
+      
+      {/* Render IntroTransition in a separate portal div to isolate it from WebGL context */}
+      {gameState.introPhase === 'transitioning' && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 1500, // Higher z-index to ensure it's on top
+          pointerEvents: 'auto' // Allow interaction with the transition
+        }}>
+          <IntroTransition onComplete={handleTransitionComplete} />
+        </div>
       )}
 
       {/* Render Narrative Reader during its phase */}
