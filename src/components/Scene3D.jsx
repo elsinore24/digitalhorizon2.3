@@ -117,16 +117,16 @@ export default function Scene3D({ dataPerceptionMode }) {
     starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
     const starMaterial = new THREE.PointsMaterial({
       color: 0xffffff,
-      size: 1.5,
+      size: 2.0, // Increased size
       sizeAttenuation: true, // Smaller when farther
       transparent: true,
-      opacity: 0.8,
+      opacity: 1.0, // Increased opacity
       fog: false // Make stars ignore scene fog
     });
     const stars = new THREE.Points(starGeometry, starMaterial);
     sceneRef.current.add(stars);
-    sceneRef.current.fog = new THREE.FogExp2(0x000000, 0.003); // Reduced fog density slightly
-    backgroundElementsRef.current.stars = stars;
+    sceneRef.current.fog = new THREE.FogExp2(0x000000, 0.003); // Re-enable fog
+    // backgroundElementsRef.current.stars = stars; // Don't add stars to backgroundElementsRef for opacity animation
     starsRef.current = stars; // Store for rotation
 
     // --- Create Nebula/Galaxy Planes ---
@@ -137,10 +137,10 @@ export default function Scene3D({ dataPerceptionMode }) {
     const nebulaMaterial = new THREE.MeshBasicMaterial({
       map: nebulaTexture, // Use loaded nebula texture
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.3, // Increased opacity
       side: THREE.DoubleSide,
       depthWrite: false, // Render behind stars usually
-      blending: THREE.AdditiveBlending
+      blending: THREE.NormalBlending // Changed blending
     });
     const nebulaPlane1 = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), nebulaMaterial); // Uncommented nebula
     nebulaPlane1.position.z = -200;
@@ -152,10 +152,10 @@ export default function Scene3D({ dataPerceptionMode }) {
     const galaxyMaterial = new THREE.MeshBasicMaterial({ // Use loaded galaxy texture
       map: galaxyTexture,
       transparent: true,
-      opacity: 0.1,
+      opacity: 0.25, // Increased opacity
       side: THREE.DoubleSide,
       depthWrite: false,
-      blending: THREE.AdditiveBlending
+      blending: THREE.NormalBlending // Changed blending
     });
      const galaxyPlane = new THREE.Mesh(new THREE.PlaneGeometry(800, 100), galaxyMaterial);
      galaxyPlane.position.z = -1200; // Pushed significantly further back
@@ -191,8 +191,12 @@ export default function Scene3D({ dataPerceptionMode }) {
     // dataStructuresRef.current.grid = gridHelper
   }
 
+  // Throttle log counter
+  let frameCount = 0;
+  const logInterval = 60; // Log every 60 frames
+
   const updateSceneEffects = () => { // Renamed function
-    if (!dataStructuresRef.current) return
+    // if (!dataStructuresRef.current) return // Keep this commented out as it's not used for background
 
     const time = performance.now() * 0.001
 
@@ -215,6 +219,7 @@ export default function Scene3D({ dataPerceptionMode }) {
     if (starsRef.current) {
       starsRef.current.rotation.y += 0.0001;
       starsRef.current.rotation.x += 0.00005;
+
     }
 
     // Add subtle movement/opacity changes to nebulae if desired
@@ -227,25 +232,36 @@ export default function Scene3D({ dataPerceptionMode }) {
   }
 
   useEffect(() => {
-    if (!dataStructuresRef.current) return
+    // Animate background elements based on dataPerceptionMode
+    if (!backgroundElementsRef.current) return;
 
-    Object.values(dataStructuresRef.current).forEach(object => {
-      if (!object) return
+    // Define target opacities
+    const targetOpacityActive = 0.4; // Make background elements more visible
+    const defaultOpacities = {
+      nebula1: 0.15, // Default from createSceneElements
+      galaxy: 0.1,   // Default from createSceneElements
+      // Add other background elements here if needed
+    };
 
-      // Toggle visibility with animation
+    Object.entries(backgroundElementsRef.current).forEach(([key, object]) => {
+      if (!object || !object.material) return;
+
+      const targetOpacity = dataPerceptionMode
+        ? targetOpacityActive
+        : (defaultOpacities[key] !== undefined ? defaultOpacities[key] : object.material.opacity); // Fallback to current if no default
+
       gsap.to(object.material, {
-        opacity: dataPerceptionMode ? 1 : 0,
+        opacity: targetOpacity,
         duration: 0.8,
         ease: 'power2.inOut',
-        onStart: () => {
-          if (dataPerceptionMode) object.visible = true
-        },
-        onComplete: () => {
-          if (!dataPerceptionMode) object.visible = false
-        }
-      })
-    })
-  }, [dataPerceptionMode])
+      });
+    });
+
+    // Note: We removed the logic that toggled dataStructuresRef (terminal, grid)
+    // as they are currently commented out in createSceneElements.
+    // If they are re-enabled, their visibility logic might need revisiting.
+
+  }, [dataPerceptionMode]);
 
   return <div
     ref={containerRef}

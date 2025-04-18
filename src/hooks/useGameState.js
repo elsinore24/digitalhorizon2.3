@@ -35,21 +35,16 @@ const useGameState = create((set) => ({
     }
   })),
 
-  toggleDataPerception: () => set((state) => {
-    console.log('[Zustand Toggle] Before:', state.gameState.dataPerceptionActive); // DEBUG LOG
-    const newState = !state.gameState.dataPerceptionActive;
-    console.log('[Zustand Toggle] After:', newState); // DEBUG LOG
-    return {
-      gameState: {
-        ...state.gameState,
-        dataPerceptionActive: newState,
-        player: {
-          ...state.gameState.player,
-          stabilityMeter: Math.max(0, state.gameState.player.stabilityMeter - 2)
-        }
+  toggleDataPerception: () => set((state) => ({
+    gameState: {
+      ...state.gameState,
+      dataPerceptionActive: !state.gameState.dataPerceptionActive,
+      player: {
+        ...state.gameState.player,
+        stabilityMeter: Math.max(0, state.gameState.player.stabilityMeter - 2)
       }
-    };
-  }),
+    }
+  })),
 
   // Add setIntroPhase action to Zustand store
   setIntroPhase: (phase) => set((state) => {
