@@ -304,15 +304,16 @@ const NarrativeReader = ({
       <>
         {/* Image Container is now MOVED inside narrativeBox */}
 
-        {/* Existing Narrative Box */}
-        {narrativeData && ( // Conditionally render narrative box as well
+        {/* Image Container - Now outside narrativeBox */}
+        {narrativeData && (
+          <div className={`${styles.lunarImageContainer} ${imageVisible ? styles.fadeInActive : ''}`}>
+            <img src={backgroundImageUrl} alt="Narrative background" className={styles.lunarImage} />
+          </div>
+        )}
+
+        {/* Narrative Box */}
+        {narrativeData && (
           <div className={styles.narrativeBox}>
-            {/* MOVED: Image Container */}
-            {narrativeData && ( // Only show image container if there's a narrative
-              <div className={`${styles.lunarImageContainer} ${imageVisible ? styles.fadeInActive : ''}`}>
-                <img src={backgroundImageUrl} alt="Narrative background" className={styles.lunarImage} />
-              </div>
-            )}
 
             {/* Add Arrow Buttons */}
             <button className={styles.prevArrow} onClick={handlePrevPage} disabled={isFirstPage}>{'<'}</button>
