@@ -2,14 +2,14 @@
 
 .narrativeContainer {
   position: fixed;
-  bottom: 150px; /* Increased bottom margin to accommodate arrows */
+  bottom: 20px; /* Further lowered container position */
   left: 50%;
   transform: translateX(-50%);
   width: 90%;
   max-width: 800px;
   z-index: 1000;
   color: white;
-  padding-bottom: 60px; /* Add padding for arrows */
+  padding-bottom: 60px;
 }
 
 .narrativeBox {
@@ -69,19 +69,22 @@
 }
 
 .narrativeText {
-  font-size: 18px; /* Match DialogueSystem or adjust */
+  font-size: 18px;
   line-height: 1.6;
-  font-family: 'Arial', sans-serif; /* Consider a more readable font for longer text */
-  white-space: pre-wrap; /* Preserve line breaks in the text */
+  font-family: 'Arial', sans-serif;
+  white-space: pre-wrap;
   text-align: left;
-  height: 120px; /* Reduced height for desktop */
-  overflow-y: auto; /* Enable vertical scrolling if content overflows */
-  padding-right: 5px; /* Add padding to prevent scrollbar overlap */
+  height: 160px; /* Restored original height */
+  overflow-y: auto;
+  padding: 5px 5px 0 0;
+  position: relative;
+  top: 40px; /* Lowered position */
 }
 
 @media (max-width: 768px) {
   .narrativeText {
-    height: 160px; /* Original height for mobile */
+    height: 180px; /* Increased height for mobile */
+    top: 0;
   }
 }
 
