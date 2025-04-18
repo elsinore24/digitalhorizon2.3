@@ -302,19 +302,21 @@ const NarrativeReader = ({
     >
       {/* Use a Fragment to return multiple elements */}
       <>
-        {/* NEW: Image Container */}
-        {narrativeData && ( // Only show image container if there's a narrative
-          <div className={`${styles.lunarImageContainer} ${imageVisible ? styles.fadeInActive : ''}`}>
-            <img src={backgroundImageUrl} alt="Narrative background" className={styles.lunarImage} />
-          </div>
-        )}
+        {/* Image Container is now MOVED inside narrativeBox */}
 
         {/* Existing Narrative Box */}
         {narrativeData && ( // Conditionally render narrative box as well
           <div className={styles.narrativeBox}>
+            {/* MOVED: Image Container */}
+            {narrativeData && ( // Only show image container if there's a narrative
+              <div className={`${styles.lunarImageContainer} ${imageVisible ? styles.fadeInActive : ''}`}>
+                <img src={backgroundImageUrl} alt="Narrative background" className={styles.lunarImage} />
+              </div>
+            )}
+
             {/* Add Arrow Buttons */}
-            <button className={styles.prevArrow} onClick={handlePrevPage} disabled={isFirstPage}>&lt;</button>
-            <button className={styles.nextArrow} onClick={handleNextPage} disabled={isLastPage}>&gt;</button>
+            <button className={styles.prevArrow} onClick={handlePrevPage} disabled={isFirstPage}>{'<'}</button>
+            <button className={styles.nextArrow} onClick={handleNextPage} disabled={isLastPage}>{'>'}</button>
 
             <div className={styles.narrativeText}>
               {currentPageText}

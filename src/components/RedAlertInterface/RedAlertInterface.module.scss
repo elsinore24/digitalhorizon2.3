@@ -107,18 +107,20 @@
 }
 
 .actionButton {
-  background-color: #500;
-  color: #f00;
-  border: 2px solid #f00;
+  background-color: #f00; /* Changed */
+  color: #fff; /* Changed */
+  border: 2px solid #fff; /* Changed */
   padding: 10px 20px;
   font-size: 16px;
   cursor: pointer;
-  animation: pulse 1s infinite;
+  /* animation: pulse 1s infinite; */ /* Removed old pulse */
+  animation: pulseGlow 1.5s infinite; /* Added glow */
   font-family: 'Courier New', monospace; /* Ensure button uses the same font */
 
   &:hover {
-    background-color: #700;
-    color: #ffcccc;
+    background-color: #d00; /* Slightly darker red on hover */
+    color: #fff; /* Keep text white */
+    border-color: #eee; /* Slightly dimmer border */
   }
 }
 
@@ -155,4 +157,9 @@
   0% { opacity: 0.9; }
   50% { opacity: 0.4; }
   100% { opacity: 0.9; }
+}
+
+@keyframes pulseGlow { /* Added */
+  0%, 100% { box-shadow: 0 0 10px 5px rgba(255, 255, 255, 0.7); }
+  50% { box-shadow: 0 0 20px 10px rgba(255, 255, 255, 0.3); }
 }

@@ -107,14 +107,15 @@ const LunarArrival = ({ dataPerceptionMode }) => {
       )}
 
       {/* Render Narrative Reader during its phase */}
-      {gameState.introPhase === 'flashbackNarrative' && !dataPerceptionMode && ( // <-- Hide if dataPerceptionMode is true
-        <NarrativeReader
-          narrativeId={flashbackNarrativeId} // Use placeholder ID
-          backgroundImageUrl={labBackgroundImage} // Use placeholder image
-          onComplete={handleNarrativeComplete}
-          // Pass dataPerceptionMode if NarrativeReader needs to be hidden by it later
-          // dataPerceptionMode={dataPerceptionMode} // Example: Keep narrative visible even in data mode during flashback
-        />
+      {/* Render Narrative Reader during its phase, hide visually instead of unmounting */}
+      {gameState.introPhase === 'flashbackNarrative' && (
+        <div style={{ display: dataPerceptionMode ? 'none' : 'block' }}>
+          <NarrativeReader
+            narrativeId={flashbackNarrativeId} // Use placeholder ID
+            backgroundImageUrl={labBackgroundImage} // Use placeholder image
+            onComplete={handleNarrativeComplete}
+          />
+        </div>
       )}
 
       {/* Render Choice Point during its phase */}

@@ -14,13 +14,14 @@
 .narrativeBox {
   background: transparent; /* Removed black background */
   /* border: 1px solid var(--color-primary); Removed border */
-  border-radius: 4px;
+  border-radius: 4px; // Revert to original value
   padding: 20px;
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
   display: flex;
   flex-direction: column;
   gap: 15px;
   position: relative; // Added for arrow positioning context
+  overflow: hidden; /* Added for image clipping */
 }
 
 /* Styles for the new arrow buttons */
@@ -127,17 +128,23 @@
 .lunarImageContainer {
   position: relative;
   width: 90%;
-  max-width: 400px;
-  margin: 0 auto 20px auto;
+  /* max-width: 400px; Removed as per plan */
+  /* margin: 0 auto 20px auto; Removed */
+  margin-bottom: 15px; /* Added */
   opacity: 0;
   transition: opacity 2s ease-in; // 2-second fade-in
+  overflow: hidden; // Apply clipping directly to the image container
+  border-radius: 30px; // Match the viewport frame radius
+  /* aspect-ratio: 16 / 9; Removed */
+  height: 40vh; /* Added */
 }
 
 .lunarImage {
   display: block;
   width: 100%;
-  height: auto;
-  border-radius: 4px;
+  height: 100%; /* Changed from auto */
+  /* border-radius: 4px; Removed, applied to container */
+  object-fit: cover; /* Added */
 }
 
 // Style to trigger the fade-in
@@ -154,4 +161,11 @@
 // Class to explicitly hide the container
 .hidden {
   display: none !important;
+}
+
+/* Media query for smaller screens */
+@media (max-width: 768px) {
+  .lunarImageContainer {
+    height: 50vh; /* Adjust height for smaller screens */
+  }
 }

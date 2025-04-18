@@ -13,7 +13,9 @@ export default function useAudio() {
     pauseAudio: context?.pauseAudio,
     resumeAudio: context?.resumeAudio,
     getAnalyzerData: context?.getAnalyzerData,
-    playAudioFile: context?.playAudioFile
+    playAudioFile: context?.playAudioFile,
+    storeAudioStateBeforeToggle: context?.storeAudioStateBeforeToggle,
+    restoreAudioStateAfterToggle: context?.restoreAudioStateAfterToggle
   });
   
   // Update the refs when the context functions change
@@ -25,7 +27,9 @@ export default function useAudio() {
       pauseAudio: context?.pauseAudio,
       resumeAudio: context?.resumeAudio,
       getAnalyzerData: context?.getAnalyzerData,
-      playAudioFile: context?.playAudioFile
+      playAudioFile: context?.playAudioFile,
+      storeAudioStateBeforeToggle: context?.storeAudioStateBeforeToggle,
+      restoreAudioStateAfterToggle: context?.restoreAudioStateAfterToggle
     };
   }, [
     context?.playNarration,
@@ -34,7 +38,9 @@ export default function useAudio() {
     context?.pauseAudio,
     context?.resumeAudio,
     context?.getAnalyzerData,
-    context?.playAudioFile
+    context?.playAudioFile,
+    context?.storeAudioStateBeforeToggle,
+    context?.restoreAudioStateAfterToggle
   ]);
   
   // Wrap the context methods in useCallback with empty dependency arrays
@@ -83,6 +89,18 @@ export default function useAudio() {
     }
   }, []);
   
+  const storeAudioStateBeforeToggle = useCallback(() => {
+    if (contextFunctionsRef.current.storeAudioStateBeforeToggle) {
+      contextFunctionsRef.current.storeAudioStateBeforeToggle();
+    }
+  }, []);
+  
+  const restoreAudioStateAfterToggle = useCallback(() => {
+    if (contextFunctionsRef.current.restoreAudioStateAfterToggle) {
+      contextFunctionsRef.current.restoreAudioStateAfterToggle();
+    }
+  }, []);
+  
   // Return a consistent object shape every time
   return {
     isPlaying: context ? context.isPlaying : false,
@@ -96,6 +114,8 @@ export default function useAudio() {
     toggleMute,
     playAudioFile,
     pauseAudio,
-    resumeAudio
+    resumeAudio,
+    storeAudioStateBeforeToggle,
+    restoreAudioStateAfterToggle
   }
 }
