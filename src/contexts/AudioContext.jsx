@@ -868,7 +868,7 @@ export function AudioProvider({ children }) {
   }, []); // Dependencies: isMuted state is implicitly handled by setIsMuted setter. Refs don't need to be deps.
   // Function to pause the currently playing audio
   const pauseAudio = useCallback(() => {
-    const currentAudio = audioRef.current; // Get the potentially active audio element
+    const currentAudio = audioElementRef.current; // Target the main audio element ref
     if (currentAudio && typeof currentAudio.pause === 'function' && !currentAudio.paused) {
       try {
         currentAudio.pause();
@@ -882,7 +882,7 @@ export function AudioProvider({ children }) {
 
   // Function to resume the currently paused audio
   const resumeAudio = useCallback(() => {
-    const currentAudio = audioRef.current; // Get the potentially active audio element
+    const currentAudio = audioElementRef.current; // Target the main audio element ref
     if (currentAudio && typeof currentAudio.play === 'function' && currentAudio.paused) {
       currentAudio.play().then(() => {
         setIsPlaying(true); // Update state to reflect playback
