@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useAudio from '../../hooks/useAudio';
+import useAutoScroll from '../../hooks/useAutoScroll';
 import styles from './NarrativeReader.module.scss';
 
 const NarrativeReader = ({
@@ -19,15 +20,32 @@ const NarrativeReader = ({
     getAudioInstance
   } = useAudio();
   const [isPausedByUser, setIsPausedByUser] = useState(false);
-  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true); // Renamed state
+  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [imageVisible, setImageVisible] = useState(false);
-  const audioInstanceRef = useRef(null); // Ref to store the audio instance
-  const playPauseButtonRef = useRef(null); // Ref for the play/pause button
-  const initialPlayTriggeredRef = useRef(false); // Ref to track if initial play was triggered
-
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+  const audioInstanceRef = useRef(null);
+  const playPauseButtonRef = useRef(null);
+  const initialPlayTriggeredRef = useRef(false);
   const textContainerRef = useRef(null);
   const [totalScrollableHeight, setTotalScrollableHeight] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+
+  const {
+    scrollProgress,
+    isScrolling,
+    showResumeButton,
+    updateScrollPosition,
+    handleManualScroll,
+    resumeAutoScroll
+  } = useAutoScroll({
+    scrollRef: textContainerRef,
+    audioInstance: getAudioInstance(),
+    isPlaying,
+    isPausedByUser,
+    isAutoScrollEnabled,
+    totalScrollableHeight,
+    audioDuration
+  });
 
   // Effect to fetch narrative data and start audio
   useEffect(() => {
@@ -188,66 +206,16 @@ const NarrativeReader = ({
 
   }, [getAudioInstance, narrativeData]); // Depend on getAudioInstance and narrativeData
 
-  // Effect for JavaScript-based auto-scrolling
+  // Effect to show/hide scroll indicator
   useEffect(() => {
-    const textContainer = textContainerRef.current;
-    const audioInstance = getAudioInstance(); // Get the current audio instance
-
-    // Only proceed if we have the necessary elements, audio is playing, and auto-scroll is enabled
-    if (textContainer && audioInstance && isPlaying && !isPausedByUser && isAutoScrollEnabled && totalScrollableHeight > 0 && audioDuration > 0) {
-
-      let animationFrameId;
-      let lastScrollTime = 0;
-
-      const scrollText = (timestamp) => {
-        // Calculate current scroll position based on audio progress
-        const currentTime = audioInstance.seek ? audioInstance.seek() : audioInstance.currentTime;
-        const progress = Math.min(1, Math.max(0, currentTime / audioDuration)); // Clamp between 0-1
-        const targetScrollTop = totalScrollableHeight * progress;
-
-        // Only update scroll position if audio time has changed significantly (>50ms)
-        if (timestamp - lastScrollTime > 50) {
-          textContainer.scrollTop = targetScrollTop;
-          lastScrollTime = timestamp;
-
-          console.debug('[NarrativeReader] Auto-scroll update:', {
-            timestamp,
-            currentTime,
-            audioDuration,
-            progress,
-            targetScrollTop,
-            actualScrollTop: textContainer.scrollTop,
-            scrollHeight: textContainer.scrollHeight,
-            clientHeight: textContainer.clientHeight,
-            totalScrollableHeight
-          });
-        }
-
-        // Continue the loop if audio is still playing and auto-scroll is enabled
-        if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
-          animationFrameId = requestAnimationFrame(scrollText);
-        }
-      };
-
-      console.log('[NarrativeReader] Starting JavaScript auto-scroll animation.');
-      // Start the animation loop
-      animationFrameId = requestAnimationFrame(scrollText);
-
-      // Cleanup function to stop the animation loop
-      return () => {
-        console.log('[NarrativeReader] Stopping JavaScript auto-scroll animation.');
-        cancelAnimationFrame(animationFrameId);
-      };
+    if (isAutoScrollEnabled && isScrolling) {
+      setShowScrollIndicator(true);
+      const timer = setTimeout(() => setShowScrollIndicator(false), 2000);
+      return () => clearTimeout(timer);
     } else {
-       // If conditions are not met, ensure scroll position is reset if auto-scroll was just disabled
-       if (textContainer && !isAutoScrollEnabled) {
-          textContainer.scrollTop = 0;
-          console.log('[NarrativeReader] Auto-scroll disabled, resetting scroll position.');
-       }
+      setShowScrollIndicator(false);
     }
-
-    // Dependencies: Re-run this effect if these values change
-  }, [isPlaying, isPausedByUser, isAutoScrollEnabled, totalScrollableHeight, audioDuration, textContainerRef, getAudioInstance]);
+  }, [isAutoScrollEnabled, isScrolling]);
 
 
   // Effect to trigger image fade-in
@@ -341,26 +309,29 @@ const NarrativeReader = ({
     }
   };
 
-  // Handler for the Auto Scroll toggle (Renamed)
+  // Handler for the Auto Scroll toggle with momentum effect
   const handleToggleAutoScroll = () => {
-    setIsAutoScrollEnabled(prev => !prev); // Updated state
-  };
-
-  // Manual scroll test function
-  const handleManualScrollTest = () => {
-    if (textContainerRef.current) {
-      const container = textContainerRef.current;
-      const scrollHeight = container.scrollHeight;
-      const clientHeight = container.clientHeight;
-      const scrollableHeight = scrollHeight - clientHeight;
-      
-      // Scroll to bottom then back to top
-      container.scrollTop = scrollableHeight;
-      setTimeout(() => {
-        container.scrollTop = 0;
-      }, 1000);
+    const newState = !isAutoScrollEnabled;
+    setIsAutoScrollEnabled(newState);
+    
+    if (newState && textContainerRef.current) {
+      // When enabling, smoothly scroll to current audio position
+      const audioInstance = getAudioInstance();
+      if (audioInstance) {
+        const currentTime = audioInstance.seek ? audioInstance.seek() : audioInstance.currentTime;
+        const progress = Math.min(1, Math.max(0, currentTime / audioDuration));
+        const targetScrollTop = totalScrollableHeight * progress;
+        
+        // Smooth scroll with easing
+        textContainerRef.current.scrollTo({
+          top: targetScrollTop,
+          behavior: 'smooth'
+        });
+      }
     }
   };
+
+    
 
   if (isLoading) {
     return <div className={styles.loading}>Loading Narrative...</div>;
@@ -399,7 +370,7 @@ const NarrativeReader = ({
             <div
               className={styles.narrativeText}
               ref={textContainerRef}
-              // Removed onScroll handler
+              onScroll={handleManualScroll}
             >
               {/* Render all page text sequentially */}
               {pagesExist && narrativeData.pages.map((page, i) => (
@@ -426,10 +397,11 @@ const NarrativeReader = ({
                 Auto Scroll {/* Updated label text */}
               </label>
 
-              {/* Manual Scroll Test Button */}
-              <button onClick={handleManualScrollTest}>
-                Test Scroll
-              </button>
+              {/* Scroll Indicator */}
+              <div className={`${styles.scrollIndicator} ${showScrollIndicator ? styles.visible : ''}`}>
+                Auto-scrolling...
+              </div>
+              
             </div>
           </div>
         )}

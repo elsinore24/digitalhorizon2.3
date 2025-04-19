@@ -1,86 +1,88 @@
 # Narrative Scroll Implementation Plan
 
 ## Current Implementation Analysis
-- Linear scroll mapping based on audio progress
-- Uses requestAnimationFrame for smooth updates
-- Lacks performance optimizations
-- Minimal user control/interruption handling
+- Uses custom `useAutoScroll` hook with basic debouncing
+- Tracks scroll position relative to audio progress
+- Includes basic UX features (scroll indicators, paragraph snapping)
+- Partial performance optimizations (debouncing, height caching)
 
-## Performance Optimizations (High Priority)
+## Improvement Roadmap
 
-### 1. Debounced Updates
 ```mermaid
 graph TD
-    A[Audio Time Update] --> B{Debounce Interval?}
-    B -->|Yes| C[Skip Frame]
-    B -->|No| D[Calculate Scroll Position]
+    A[Performance Optimizations] --> B[Debounce Updates]
+    A --> C[Cache Scroll Height] 
+    A --> D[IntersectionObserver]
+    E[UX Enhancements] --> F[Momentum Scrolling]
+    E --> G[Paragraph Snapping]
+    E --> H[Visual Indicators]
+    I[Code Structure] --> J[Extract to Custom Hook]
+    I --> K[Configuration Options]
 ```
 
-### 2. Cached Measurements
-- Store scrollHeight in ref after initial calculation
-- Only recalculate on window resize or content change
+### Phase 1: Performance Optimizations (High Priority)
+1. **Enhanced Debouncing**
+   - Throttle scroll position updates to 100ms intervals
+   - Cache calculations between frames
+   - Use requestAnimationFrame for smooth updates
 
-### 3. IntersectionObserver
-- Track visible paragraphs for efficient rendering
-- Implement lazy loading for long narratives
+2. **Scroll Height Caching**
+   - Implement ResizeObserver for dynamic content changes
+   - Cache calculated heights in refs
+   - Recalculate only when content changes
 
-## UX Enhancements (Medium Priority)
+3. **IntersectionObserver Optimization**
+   - Track visible paragraphs efficiently
+   - Implement lazy disconnect/reconnect
+   - Adjust thresholds for better accuracy
 
-### 1. Momentum Scrolling
-- Physics-based easing when manually interrupted
-- Smooth acceleration/deceleration curves
+### Phase 2: UX Enhancements (Medium Priority)
+1. **Momentum Scrolling**
+   - Physics-based easing
+   - Velocity tracking
+   - Natural deceleration
 
-### 2. Paragraph Snapping
+2. **Paragraph Snapping**
+   - Threshold detection (50px)
+   - Smooth alignment
+   - Visual feedback
+
+3. **Visual Indicators**
+   - Auto-scroll state
+   - Current position
+   - Scroll direction
+
+### Phase 3: Code Structure (High Priority)
+1. **Custom Hook Refactor**
 ```javascript
-function snapToParagraph(scrollTop) {
-  const paragraphs = Array.from(container.querySelectorAll('.pageContent'));
-  const targets = paragraphs.map(p => p.getBoundingClientRect().top);
-  // Find nearest paragraph boundary
-}
-```
-
-### 3. Visual Indicators
-- Auto-scroll active state (CSS animation)
-- Current position indicator
-- Scroll progress bar
-
-## Code Structure Improvements
-
-### 1. Custom Hook (`useAutoScroll`)
-```javascript
-export function useAutoScroll({
+const {
+  scrollRef,
+  isScrolling,
+  progress,
+  enableAutoScroll,
+  disableAutoScroll
+} = useAutoScroll({
   duration,
-  debounceInterval = 100,
-  snapThreshold = 50
-}) {
-  // Implementation...
-}
+  debounceInterval: 100,
+  snapThreshold: 50,
+  momentum: true
+});
 ```
 
-### 2. Configuration Options
-- Scroll speed adjustment
-- Easing function selection
-- Snap sensitivity
+2. **Configuration Options**
+   - Scroll speed
+   - Easing functions
+   - Threshold values
+   - Performance tuning
 
-## Implementation Phases
+## Implementation Timeline
+1. Week 1: Performance optimizations
+2. Week 2: UX enhancements
+3. Week 3: Code refactoring
+4. Week 4: Testing and polish
 
-1. **Phase 1**: Performance Foundations
-   - Extract to custom hook
-   - Add debouncing and caching
-   - Basic interruption handling
-
-2. **Phase 2**: UX Polish
-   - Momentum scrolling
-   - Paragraph snapping
-   - Visual indicators
-
-3. **Phase 3**: Advanced Features
-   - Accessibility enhancements
-   - Reduced motion support
-   - Keyboard controls
-
-## Testing Strategy
-1. Unit tests for scroll calculations
-2. Performance profiling
-3. Cross-browser testing
-4. Long narrative stress testing
+## Testing Considerations
+- Different content lengths
+- Various screen sizes
+- Performance metrics
+- Accessibility validation
