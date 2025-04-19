@@ -156,7 +156,9 @@ const NarrativeReader = ({
     }
 
     const currentPage = pages[currentPageIndex];
-    const nextPageTimestamp = currentPageIndex < pages.length - 1 ? pages[currentPageIndex + 1].timestamp : audioInstance.duration(); // Use duration() for Howler
+    // Check if audioInstance.duration is a function (Howler) or a property (HTMLAudioElement)
+    const audioDuration = typeof audioInstance.duration === 'function' ? audioInstance.duration() : audioInstance.duration;
+    const nextPageTimestamp = currentPageIndex < pages.length - 1 ? pages[currentPageIndex + 1].timestamp : audioDuration;
     const segmentDuration = nextPageTimestamp - currentPage.timestamp;
     const timeIntoSegment = currentTime - currentPage.timestamp;
 
