@@ -26,16 +26,17 @@ const NarrativeReader = ({
   const initialPlayTriggeredRef = useRef(false); // Ref to track if initial play was triggered
 
   const textContainerRef = useRef(null);
-  const [scrollPosition, setScrollPosition] = useState(0);
-  const [maxScrollHeight, setMaxScrollHeight] = useState(0);
+  const [totalScrollableHeight, setTotalScrollableHeight] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
 
   // Effect to fetch narrative data and start audio
   useEffect(() => {
     // Reset state when narrativeId changes or is null
     setNarrativeData(null);
-    // Removed setCurrentPageIndex(0);
     setIsPausedByUser(false); // Reset pause state
     setImageVisible(false); // Reset image visibility
+    setTotalScrollableHeight(0); // Reset scroll height
+    setAudioDuration(0); // Reset audio duration
 
     if (!narrativeId) {
       // If there's an active audio instance from a previous narrative, stop it
@@ -62,26 +63,14 @@ const NarrativeReader = ({
         }
         const data = await response.json();
         setNarrativeData(data);
-        // Trigger audio playback using the narrativeId to construct the correct path
-        // The audio files are stored in public/audio/narration/ with the narrativeId as filename
-        // Revert: Always try to play audio on fetch (unless it's iOS and handled by handleEnter timeout)
-        // We rely on the AudioContext to handle the potential delay/pending state.
+
         if (data.audio) {
-           // The playAudioFile call might be deferred by handleEnter on iOS
-           // For non-iOS or subsequent loads, this should play directly.
-           // Let AudioContext handle the actual playback logic based on its state.
-           // playAudioFile(data.audio); // Removed direct call here, handleEnter handles initial iOS play
-           console.log('[NarrativeReader] Narrative fetched, audio path:', data.audio);
-           // Always attempt to load the audio file when narrative data is fetched.
-           // The actual playback start might be deferred or handled by the programmatic click.
            console.log('[NarrativeReader] Narrative fetched, loading audio:', data.audio);
            playAudioFile(data.audio);
         } else {
           console.warn(`Narrative ${narrativeId} is missing the 'audio' property in its JSON data.`);
         }
 
-        // Removed TODO related to data.audio
-        // Removed line: playAudio(data.audio);
       } catch (e) {
         console.error("[NarrativeReader] CATCH BLOCK: Failed to fetch narrative:", e); // Add specific log
         setError(`Failed to load narrative: ${narrativeId}. Error: ${e.message}`);
@@ -91,8 +80,175 @@ const NarrativeReader = ({
     };
 
     fetchNarrative();
-  // Re-add playAudioFile dependency since it's used in the effect
-  }, [narrativeId, playAudioFile]); // Revert: Remove immediatePlaybackNeeded dependency
+  }, [narrativeId, playAudioFile]);
+
+  // Effect to calculate total scrollable height after narrative data is loaded and rendered
+  useEffect(() => {
+    if (narrativeData && textContainerRef.current) {
+      // Ensure content is rendered before calculating
+      const calculateHeight = () => {
+        const scrollHeight = textContainerRef.current.scrollHeight;
+        const clientHeight = textContainerRef.current.clientHeight;
+        const calculatedTotalScrollableHeight = scrollHeight - clientHeight;
+        setTotalScrollableHeight(calculatedTotalScrollableHeight);
+        console.log('[NarrativeReader] Calculated totalScrollableHeight:', calculatedTotalScrollableHeight);
+      };
+
+      // Use a small timeout to ensure DOM is updated after data render
+      const timer = setTimeout(calculateHeight, 50);
+
+      return () => clearTimeout(timer);
+    }
+  }, [narrativeData]); // Recalculate when narrative data changes
+
+  // Effect to get audio duration
+  useEffect(() => {
+    const audioInstance = getAudioInstance();
+    let isMounted = true; // Flag to prevent state updates on unmounted component
+
+    const getDuration = (instance) => {
+      if (!instance) return null; // Add check for null instance
+
+      // Check if duration property exists and is a valid number
+      if (typeof instance.duration === 'number' && instance.duration > 0 && isFinite(instance.duration)) {
+        return instance.duration;
+      }
+
+      // Check if duration method exists and returns a valid number
+      if (typeof instance.duration === 'function') {
+        const funcDuration = instance.duration();
+        if (typeof funcDuration === 'number' && funcDuration > 0 && isFinite(funcDuration)) {
+          return funcDuration;
+        }
+      }
+
+      // If neither is found or valid, return null
+      return null;
+    };
+
+    if (audioInstance) {
+      const handleLoadedMetadata = () => {
+        // Check if component is still mounted before updating state
+        if (isMounted) {
+          const loadedDuration = getDuration(audioInstance);
+          if (loadedDuration !== null) {
+            setAudioDuration(loadedDuration);
+            console.log('[NarrativeReader] Audio duration available after loadedmetadata:', loadedDuration);
+          } else {
+             console.warn('[NarrativeReader] Audio duration from loadedmetadata is invalid or not available.');
+          }
+        }
+      };
+
+      // Check if duration is already available (e.g., if audio was cached)
+      const initialDuration = getDuration(audioInstance);
+      if (initialDuration !== null) {
+         if (isMounted) {
+            setAudioDuration(initialDuration);
+            console.log('[NarrativeReader] Audio duration available immediately:', initialDuration);
+         }
+      } else {
+         // If not immediately available, listen for 'loadedmetadata' or 'load'
+         console.warn('[NarrativeReader] Audio duration not immediately available. Adding listener.');
+         // Use 'loadedmetadata' for HTMLAudioElement, 'load' for Howler.js
+         // Determine the correct event name based on the instance type
+         const eventName = typeof audioInstance.duration === 'function' ? 'load' : 'loadedmetadata';
+         // Ensure the instance has the addEventListener method before using it
+         if (typeof audioInstance.addEventListener === 'function') {
+            audioInstance.addEventListener(eventName, handleLoadedMetadata);
+         } else if (typeof audioInstance.on === 'function') {
+            // Handle cases where it might use .on/.off (like Howler v2)
+            audioInstance.on(eventName, handleLoadedMetadata);
+         } else {
+            console.warn('[NarrativeReader] Audio instance does not support standard event listeners (addEventListener/on). Cannot track loadedmetadata.');
+         }
+
+
+         // Cleanup listener
+         return () => {
+           isMounted = false; // Set flag to false on cleanup
+           if (typeof audioInstance.removeEventListener === 'function') {
+              audioInstance.removeEventListener(eventName, handleLoadedMetadata);
+           } else if (typeof audioInstance.off === 'function') {
+              audioInstance.off(eventName, handleAudioEnd);
+           }
+         };
+      }
+
+      // Cleanup function for the case where duration was immediately available
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    // Cleanup if audioInstance is null
+    return () => {
+      isMounted = false;
+    };
+
+  }, [getAudioInstance, narrativeData]); // Depend on getAudioInstance and narrativeData
+
+  // Effect for JavaScript-based auto-scrolling
+  useEffect(() => {
+    const textContainer = textContainerRef.current;
+    const audioInstance = getAudioInstance(); // Get the current audio instance
+
+    // Only proceed if we have the necessary elements, audio is playing, and auto-scroll is enabled
+    if (textContainer && audioInstance && isPlaying && !isPausedByUser && isAutoScrollEnabled && totalScrollableHeight > 0 && audioDuration > 0) {
+
+      let animationFrameId;
+      let lastScrollTime = 0;
+
+      const scrollText = (timestamp) => {
+        // Calculate current scroll position based on audio progress
+        const currentTime = audioInstance.seek ? audioInstance.seek() : audioInstance.currentTime;
+        const progress = Math.min(1, Math.max(0, currentTime / audioDuration)); // Clamp between 0-1
+        const targetScrollTop = totalScrollableHeight * progress;
+
+        // Only update scroll position if audio time has changed significantly (>50ms)
+        if (timestamp - lastScrollTime > 50) {
+          textContainer.scrollTop = targetScrollTop;
+          lastScrollTime = timestamp;
+
+          console.debug('[NarrativeReader] Auto-scroll update:', {
+            timestamp,
+            currentTime,
+            audioDuration,
+            progress,
+            targetScrollTop,
+            actualScrollTop: textContainer.scrollTop,
+            scrollHeight: textContainer.scrollHeight,
+            clientHeight: textContainer.clientHeight,
+            totalScrollableHeight
+          });
+        }
+
+        // Continue the loop if audio is still playing and auto-scroll is enabled
+        if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
+          animationFrameId = requestAnimationFrame(scrollText);
+        }
+      };
+
+      console.log('[NarrativeReader] Starting JavaScript auto-scroll animation.');
+      // Start the animation loop
+      animationFrameId = requestAnimationFrame(scrollText);
+
+      // Cleanup function to stop the animation loop
+      return () => {
+        console.log('[NarrativeReader] Stopping JavaScript auto-scroll animation.');
+        cancelAnimationFrame(animationFrameId);
+      };
+    } else {
+       // If conditions are not met, ensure scroll position is reset if auto-scroll was just disabled
+       if (textContainer && !isAutoScrollEnabled) {
+          textContainer.scrollTop = 0;
+          console.log('[NarrativeReader] Auto-scroll disabled, resetting scroll position.');
+       }
+    }
+
+    // Dependencies: Re-run this effect if these values change
+  }, [isPlaying, isPausedByUser, isAutoScrollEnabled, totalScrollableHeight, audioDuration, textContainerRef, getAudioInstance]);
+
 
   // Effect to trigger image fade-in
   useEffect(() => {
@@ -135,97 +291,9 @@ const NarrativeReader = ({
     initialPlayTriggeredRef.current = false;
   }, [narrativeId]);
 
-  // Define handleTimeUpdate using useCallback before the effect
-  const handleTimeUpdate = useCallback(() => {
-    const audioInstance = audioInstanceRef.current;
-    // Check if auto-scroll is enabled and not paused by user
-    if (!audioInstance || !narrativeData || !isAutoScrollEnabled || isPausedByUser || !textContainerRef.current) return;
-
-    const currentTime = audioInstance.currentTime;
-    const pages = narrativeData.pages;
-    const textContainer = textContainerRef.current;
-
-    // Find the current page index based on timestamp
-    let currentPageIndex = 0;
-    for (let i = 0; i < pages.length; i++) {
-      if (currentTime >= pages[i].timestamp) {
-        currentPageIndex = i;
-      } else {
-        break;
-      }
-    }
-
-    const currentPage = pages[currentPageIndex];
-    // Check if audioInstance.duration is a function (Howler) or a property (HTMLAudioElement)
-    const audioDuration = typeof audioInstance.duration === 'function' ? audioInstance.duration() : audioInstance.duration;
-    const nextPageTimestamp = currentPageIndex < pages.length - 1 ? pages[currentPageIndex + 1].timestamp : audioDuration;
-    const segmentDuration = nextPageTimestamp - currentPage.timestamp;
-    const timeIntoSegment = currentTime - currentPage.timestamp;
-
-    // Calculate progress within the current audio segment (0 to 1)
-    const segmentProgress = segmentDuration > 0 ? Math.min(1, Math.max(0, timeIntoSegment / segmentDuration)) : 0;
-
-    // Calculate the scroll height up to the beginning of the current page
-    let scrollHeightBeforeCurrentPage = 0;
-    if (textContainer.children) {
-      // Note: textContainer.children includes all direct children, which are the pageContent divs
-      for (let i = 0; i < currentPageIndex; i++) {
-        if (textContainer.children[i]) {
-           scrollHeightBeforeCurrentPage += textContainer.children[i].offsetHeight;
-        }
-      }
-    }
-
-    // Calculate the height of the current page's text element
-    const currentPageElement = textContainer.children[currentPageIndex];
-    const currentPageHeight = currentPageElement ? currentPageElement.offsetHeight : 0;
-
-    // Calculate the target scroll position by interpolating within the current page
-    const targetScrollPosition = scrollHeightBeforeCurrentPage + (currentPageHeight * segmentProgress);
-
-    // Ensure we don't scroll past the maximum scrollable height
-    const maxScrollHeight = textContainer.scrollHeight - textContainer.clientHeight;
-    const finalTargetScrollPosition = Math.min(maxScrollHeight, targetScrollPosition);
-
-
-    if (textContainer) {
-      // Smoothly scroll to the target position
-      textContainer.scrollTo({
-        top: finalTargetScrollPosition,
-        behavior: 'smooth'
-      });
-      // setScrollPosition(finalTargetScrollPosition); // Optionally update state for UI feedback if needed
-    }
-  }, [narrativeData, isAutoScrollEnabled, isPausedByUser]); // Dependencies seem correct
-
-  // Effect for handling audio time updates and auto scrolling
-  useEffect(() => {
-    const audioInstance = getAudioInstance();
-    audioInstanceRef.current = audioInstance;
-
-    // Only add listener if audio is playing, narrative data exists, auto-scroll is enabled, and not paused by user
-    if (!isPlaying || !narrativeData || !isAutoScrollEnabled || isPausedByUser || !audioInstance) { // Updated state check
-      if (audioInstance) {
-        audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
-      }
-      return;
-    }
-
-    // Add timeupdate listener for auto-scrolling
-    audioInstance.addEventListener('timeupdate', handleTimeUpdate);
-
-    // Cleanup function
-    return () => {
-      if (audioInstance) {
-        audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
-      }
-    };
-  }, [isPlaying, narrativeData, isAutoScrollEnabled, isPausedByUser, getAudioInstance, handleTimeUpdate]); // Updated dependency
-
-
   // Effect for handling narrative completion
   useEffect(() => {
-    const audioInstance = audioInstanceRef.current;
+    const audioInstance = getAudioInstance(); // Use getAudioInstance to get the current instance
     // Check if onComplete is actually a function before proceeding
     if (!audioInstance || !narrativeData || typeof onComplete !== 'function') {
       return; // Exit if no audio, data, or valid callback
@@ -233,30 +301,25 @@ const NarrativeReader = ({
 
     const handleAudioEnd = () => {
       console.log('[NarrativeReader] Audio ended. Calling onComplete.');
-      // Removed page index check
       onComplete();
     };
 
     // Howler uses 'end', HTMLAudioElement uses 'ended'
-    // Assuming useAudio provides a Howler instance or similar event emitter
-    const eventName = 'end';
+    const eventName = 'end'; // Assuming useAudio provides a Howler instance or similar event emitter
+
     // Ensure addEventListener/removeEventListener exist on the instance
     if (typeof audioInstance.addEventListener === 'function' && typeof audioInstance.removeEventListener === 'function') {
        audioInstance.addEventListener(eventName, handleAudioEnd);
-       // console.log(`[NarrativeReader] Added ${eventName} listener.`);
     } else if (typeof audioInstance.on === 'function' && typeof audioInstance.off === 'function') {
        // Handle cases where it might use .on/.off (like Howler v2)
        audioInstance.on(eventName, handleAudioEnd);
-       // console.log(`[NarrativeReader] Added ${eventName} listener using .on()`);
     } else {
        console.warn('[NarrativeReader] Audio instance does not support standard event listeners (addEventListener/on). Cannot track end.');
        return; // Cannot proceed without event listeners
     }
 
-
     return () => {
       if (audioInstance) {
-        // console.log(`[NarrativeReader] Removing ${eventName} listener.`);
         if (typeof audioInstance.removeEventListener === 'function') {
            audioInstance.removeEventListener(eventName, handleAudioEnd);
         } else if (typeof audioInstance.off === 'function') {
@@ -265,23 +328,7 @@ const NarrativeReader = ({
       }
     };
     // Re-run if audio instance changes, narrative changes, or callback changes
-    // Removed currentPageIndex dependency
-  }, [narrativeData, onComplete, getAudioInstance]); // Depend on getAudioInstance to get the correct instance
-
-  const handleScroll = (direction) => {
-    if (!textContainerRef.current) return;
-
-    const scrollAmount = textContainerRef.current.clientHeight * 0.8;
-    const newPosition = direction === 'up'
-      ? Math.max(0, scrollPosition - scrollAmount)
-      : Math.min(maxScrollHeight, scrollPosition + scrollAmount);
-
-    textContainerRef.current.scrollTo({
-      top: newPosition,
-      behavior: 'smooth'
-    });
-    setScrollPosition(newPosition);
-  };
+  }, [narrativeData, onComplete, getAudioInstance]);
 
   // Handler for the Play/Pause button
   const handlePlayPause = () => {
@@ -299,16 +346,21 @@ const NarrativeReader = ({
     setIsAutoScrollEnabled(prev => !prev); // Updated state
   };
 
-  // Effect to calculate maxScrollHeight when narrative data or container size changes
-  useEffect(() => {
+  // Manual scroll test function
+  const handleManualScrollTest = () => {
     if (textContainerRef.current) {
-      // Calculate the maximum scrollable height
-      // scrollHeight is the total height of the content
-      // clientHeight is the visible height of the container
-      const calculatedMaxScrollHeight = textContainerRef.current.scrollHeight - textContainerRef.current.clientHeight;
-      setMaxScrollHeight(calculatedMaxScrollHeight);
+      const container = textContainerRef.current;
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+      const scrollableHeight = scrollHeight - clientHeight;
+      
+      // Scroll to bottom then back to top
+      container.scrollTop = scrollableHeight;
+      setTimeout(() => {
+        container.scrollTop = 0;
+      }, 1000);
     }
-  }, [narrativeData]); // Recalculate when narrative data changes
+  };
 
   if (isLoading) {
     return <div className={styles.loading}>Loading Narrative...</div>;
@@ -342,26 +394,12 @@ const NarrativeReader = ({
         {narrativeData && (
           <div className={styles.narrativeBox}>
 
-            {/* Arrow Buttons */}
-            <button
-              className={styles.prevArrow}
-              onClick={() => handleScroll('up')}
-              disabled={scrollPosition <= 0}
-            >
-              {'<'}
-            </button>
-            <button
-              className={styles.nextArrow}
-              onClick={() => handleScroll('down')}
-              disabled={scrollPosition >= maxScrollHeight}
-            >
-              {'>'}
-            </button>
+            {/* Arrow Buttons - Removed */}
 
             <div
               className={styles.narrativeText}
               ref={textContainerRef}
-              onScroll={(e) => setScrollPosition(e.target.scrollTop)}
+              // Removed onScroll handler
             >
               {/* Render all page text sequentially */}
               {pagesExist && narrativeData.pages.map((page, i) => (
@@ -387,6 +425,11 @@ const NarrativeReader = ({
                 />
                 Auto Scroll {/* Updated label text */}
               </label>
+
+              {/* Manual Scroll Test Button */}
+              <button onClick={handleManualScrollTest}>
+                Test Scroll
+              </button>
             </div>
           </div>
         )}

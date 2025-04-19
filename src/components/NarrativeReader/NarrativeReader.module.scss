@@ -54,8 +54,6 @@
   &:disabled {
     opacity: 0.4;
     cursor: not-allowed;
-    background-color: rgba(100, 100, 100, 0.5);
-    border-color: rgba(150, 150, 150, 0.8);
   }
 }
 
@@ -73,10 +71,10 @@
   font-family: 'Arial', sans-serif;
   text-align: left;
   height: 30vh;
-  max-height: 400px;
-  overflow-y: auto;
+  max-height: 350px; /* Updated max-height */
+  overflow-y: auto; /* Allow scrolling */
   padding: 20px 50px;
-  scroll-behavior: smooth;
+  scroll-behavior: smooth; /* Smooth scrolling */
 
   .pageContent {
     margin-bottom: 30px;
@@ -129,18 +127,6 @@
   }
 }
 
-.loading,
-.error {
-  text-align: center;
-  font-style: italic;
-  color: var(--color-secondary);
-  padding: 20px;
-}
-
-.error {
-  color: red;
-  font-weight: bold;
-}
 /* Add these styles */
 .lunarImageContainer {
   position: relative;

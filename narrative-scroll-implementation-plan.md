@@ -1,56 +1,86 @@
 # Narrative Scroll Implementation Plan
 
-## Overview
-Replace current paginated narrative display with a scrollable text container that:
-- Shows all text at once in a scrollable view
-- Auto-scrolls in sync with audio timestamps
-- Allows manual scrolling when auto-scroll is disabled
+## Current Implementation Analysis
+- Linear scroll mapping based on audio progress
+- Uses requestAnimationFrame for smooth updates
+- Lacks performance optimizations
+- Minimal user control/interruption handling
 
-## Component Architecture
+## Performance Optimizations (High Priority)
+
+### 1. Debounced Updates
 ```mermaid
 graph TD
-    A[NarrativeReader] --> B[ScrollableTextContainer]
-    A --> C[AutoScrollToggle]
-    A --> D[ScrollControls]
-    B --> E[TextContent]
-    B --> F[ScrollPositionManager]
-    A --> G[TimestampSync]
+    A[Audio Time Update] --> B{Debounce Interval?}
+    B -->|Yes| C[Skip Frame]
+    B -->|No| D[Calculate Scroll Position]
 ```
 
-## Implementation Details
+### 2. Cached Measurements
+- Store scrollHeight in ref after initial calculation
+- Only recalculate on window resize or content change
 
-### 1. Scrollable Text Container
-- Combine all narrative text into single continuous block
-- Set fixed height (e.g. 60vh) with overflow-y: scroll
-- Calculate scroll positions for each timestamp
-- Implement smooth scrolling animation
+### 3. IntersectionObserver
+- Track visible paragraphs for efficient rendering
+- Implement lazy loading for long narratives
 
-### 2. Auto-Scroll Functionality
-- Track current audio timestamp
-- Map timestamps to scroll positions
-- Animate scroll position changes
-- Pause auto-scroll when user manually scrolls
+## UX Enhancements (Medium Priority)
 
-### 3. Manual Controls
-- Add up/down scroll buttons
-- Implement manual scroll with arrow keys
-- Visual indicator of current position
-- Toggle between auto/manual modes
+### 1. Momentum Scrolling
+- Physics-based easing when manually interrupted
+- Smooth acceleration/deceleration curves
 
-### 4. UI Changes Required
-- Add auto-scroll toggle checkbox
-- Replace pagination arrows with scroll controls
-- Style scrollbar for better UX
-- Position indicator showing progress
+### 2. Paragraph Snapping
+```javascript
+function snapToParagraph(scrollTop) {
+  const paragraphs = Array.from(container.querySelectorAll('.pageContent'));
+  const targets = paragraphs.map(p => p.getBoundingClientRect().top);
+  // Find nearest paragraph boundary
+}
+```
 
-## Technical Considerations
-- Use React refs to manage scroll position
-- Implement scroll position calculations based on text height
-- Add debounce to scroll events
-- Optimize performance for long narratives
+### 3. Visual Indicators
+- Auto-scroll active state (CSS animation)
+- Current position indicator
+- Scroll progress bar
 
-## Timeline
-1. Modify component structure (1 hour)
-2. Implement scroll logic (2 hours)
-3. Add UI controls (1 hour)
-4. Testing and refinement (1 hour)
+## Code Structure Improvements
+
+### 1. Custom Hook (`useAutoScroll`)
+```javascript
+export function useAutoScroll({
+  duration,
+  debounceInterval = 100,
+  snapThreshold = 50
+}) {
+  // Implementation...
+}
+```
+
+### 2. Configuration Options
+- Scroll speed adjustment
+- Easing function selection
+- Snap sensitivity
+
+## Implementation Phases
+
+1. **Phase 1**: Performance Foundations
+   - Extract to custom hook
+   - Add debouncing and caching
+   - Basic interruption handling
+
+2. **Phase 2**: UX Polish
+   - Momentum scrolling
+   - Paragraph snapping
+   - Visual indicators
+
+3. **Phase 3**: Advanced Features
+   - Accessibility enhancements
+   - Reduced motion support
+   - Keyboard controls
+
+## Testing Strategy
+1. Unit tests for scroll calculations
+2. Performance profiling
+3. Cross-browser testing
+4. Long narrative stress testing
