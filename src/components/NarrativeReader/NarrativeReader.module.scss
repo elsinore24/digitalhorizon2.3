@@ -128,7 +128,13 @@
 @media (max-width: 768px) {
   .narrativeText {
     height: 30vh;
-    padding: 15px 30px;
+    padding: 15px 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .narrativeContainer {
+    width: 95%;
   }
 }
 
@@ -136,9 +142,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 5px;
   border-top: 1px solid rgba(var(--color-primary-rgb), 0.3);
-  padding-top: 15px;
+  padding-top: 10px;
 
   button {
     background-color: var(--color-primary);
