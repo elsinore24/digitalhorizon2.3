@@ -94,19 +94,19 @@ const useAutoScroll = ({
       const progress = Math.min(1, Math.max(0, currentTime / audioDuration));
       const targetScrollTop = scrollableHeightRef.current * progress;
 
-      // Handle initial scroll jump
-      if (currentTime < 0.2 && scrollRef.current.scrollTop !== 0) {
-        // If near the start and not already at the top, jump instantly to top
-        console.log('[useAutoScroll] Near start, jumping to top.');
-        scrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
-        setScrollProgress(0); // Ensure progress reflects top position
-        lastScrollTimeRef.current = timestamp; // Update last scroll time
-      } else if (timestamp - lastScrollTimeRef.current > 150) {
-        // Otherwise, proceed with throttled smooth scroll update
+      // Handle initial scroll jump (Temporarily disabled for testing)
+      // if (currentTime < 0.2 && scrollRef.current.scrollTop !== 0) {
+      //   // If near the start and not already at the top, jump instantly to top
+      //   console.log('[useAutoScroll] Near start, jumping to top.');
+      //   scrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
+      //   setScrollProgress(0); // Ensure progress reflects top position
+      //   lastScrollTimeRef.current = timestamp; // Update last scroll time
+      // } else {
+        // Proceed with smooth scroll update without throttling
         updateScrollPosition(targetScrollTop); // Call the simplified function
         setScrollProgress(progress);
-        lastScrollTimeRef.current = timestamp;
-      }
+        lastScrollTimeRef.current = timestamp; // Update last scroll time even without throttle for potential future use
+      // }
 
       if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
         animationFrameIdRef.current = requestAnimationFrame(scrollText);
