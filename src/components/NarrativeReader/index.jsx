@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import useAudio from '../../hooks/useAudio';
 import useAutoScroll from '../../hooks/useAutoScroll';
 import styles from './NarrativeReader.module.scss';
@@ -6,7 +6,6 @@ import styles from './NarrativeReader.module.scss';
 const NarrativeReader = ({
   narrativeId,
   dataPerceptionMode,
-  backgroundImageUrl = "/front_pic/moon.png", // Default background
   onComplete,
 }) => {
   const [narrativeData, setNarrativeData] = useState(null);
@@ -29,11 +28,11 @@ const NarrativeReader = ({
   const textContainerRef = useRef(null);
   const [totalScrollableHeight, setTotalScrollableHeight] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  const [currentImageUrl, setCurrentImageUrl] = useState(null); // New state for current image
 
   const {
     scrollProgress,
     isScrolling,
-    showResumeButton,
     updateScrollPosition,
     handleManualScroll,
     resumeAutoScroll
@@ -55,6 +54,7 @@ const NarrativeReader = ({
     setImageVisible(false); // Reset image visibility
     setTotalScrollableHeight(0); // Reset scroll height
     setAudioDuration(0); // Reset audio duration
+    setCurrentImageUrl(null); // Reset current image
 
     if (!narrativeId) {
       // If there's an active audio instance from a previous narrative, stop it
@@ -72,6 +72,8 @@ const NarrativeReader = ({
       setError(null);
       setNarrativeData(null); // Clear previous data
       setIsPausedByUser(false); // Ensure not paused when new narrative starts
+      setCurrentImageUrl(null); // Clear image before fetching new data
+
 
       try {
         // Assuming narratives are in /public/narratives/
@@ -81,6 +83,15 @@ const NarrativeReader = ({
         }
         const data = await response.json();
         setNarrativeData(data);
+
+        // Set initial image from the first page if available
+        if (data.pages && data.pages.length > 0 && data.pages[0].imageUrl) {
+            setCurrentImageUrl(data.pages[0].imageUrl);
+        } else {
+            // Optionally set a default image if the first page has none
+            // setCurrentImageUrl("/front_pic/default.png");
+        }
+
 
         if (data.audio) {
            console.log('[NarrativeReader] Narrative fetched, loading audio:', data.audio);
@@ -101,7 +112,7 @@ const NarrativeReader = ({
   }, [narrativeId, playAudioFile]);
 
   // Effect to calculate total scrollable height after narrative data is loaded and rendered
-  useEffect(() => {
+  useLayoutEffect(() => { // Changed to useLayoutEffect
     if (narrativeData && textContainerRef.current) {
       // Ensure content is rendered before calculating
       const calculateHeight = () => {
@@ -188,7 +199,7 @@ const NarrativeReader = ({
            if (typeof audioInstance.removeEventListener === 'function') {
               audioInstance.removeEventListener(eventName, handleLoadedMetadata);
            } else if (typeof audioInstance.off === 'function') {
-              audioInstance.off(eventName, handleAudioEnd);
+              audioInstance.off(eventName, handleAudioEnd); // Note: This should be handleLoadedMetadata, not handleAudioEnd
            }
          };
       }
@@ -197,6 +208,7 @@ const NarrativeReader = ({
       return () => {
         isMounted = false;
       };
+
     }
 
     // Cleanup if audioInstance is null
@@ -218,17 +230,18 @@ const NarrativeReader = ({
   }, [isAutoScrollEnabled, isScrolling]);
 
 
-  // Effect to trigger image fade-in
+  // Effect to trigger image fade-in (now controlled by currentImageUrl)
   useEffect(() => {
-    if (narrativeData) { // Only trigger if narrative data is loaded
+    if (currentImageUrl) { // Only trigger if there's a current image URL
       const timer = setTimeout(() => {
         setImageVisible(true);
       }, 100); // Short delay to ensure rendering before transition starts
-      return () => clearTimeout(timer); // Cleanup on unmount or narrative change
+      return () => clearTimeout(timer); // Cleanup on unmount or image change
     } else {
-      setImageVisible(false); // Reset if narrative is cleared
+      setImageVisible(false); // Reset if image is cleared
     }
-  }, [narrativeData]); // Depend on narrativeData
+  }, [currentImageUrl]); // Depend on currentImageUrl
+
 
   // Effect to programmatically click Play/Pause on initial iOS load
   useEffect(() => {
@@ -298,6 +311,89 @@ const NarrativeReader = ({
     // Re-run if audio instance changes, narrative changes, or callback changes
   }, [narrativeData, onComplete, getAudioInstance]);
 
+  // Main scroll and image sync effect
+  useEffect(() => {
+    const audioInstance = getAudioInstance();
+    const scrollTextAndSyncImage = (timestamp) => {
+      // Add checks for audioDuration and scrollableHeightRef.current being valid numbers > 0
+      if (!audioInstance || !scrollRef.current || !(scrollableHeightRef.current > 0) || !(audioDuration > 0)) {
+        // console.warn('[useAutoScroll] Missing instance, ref, valid height, or valid duration. Skipping scrollText.');
+        // Request next frame even if skipping calculation, to keep the loop alive if conditions change
+        if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
+           animationFrameIdRef.current = requestAnimationFrame(scrollTextAndSyncImage);
+        }
+        return;
+      }
+
+      const currentTime = audioInstance.seek ? audioInstance.seek() : audioInstance.currentTime;
+      const progress = Math.min(1, Math.max(0, currentTime / audioDuration));
+      const targetScrollTop = scrollableHeightRef.current * progress;
+
+      // --- Image Synchronization Logic ---
+      if (narrativeData && narrativeData.pages) {
+        let activePage = null;
+        for (let i = narrativeData.pages.length - 1; i >= 0; i--) {
+          const page = narrativeData.pages[i];
+          if (page.timestamp <= currentTime) {
+            activePage = page;
+            break;
+          }
+        }
+
+        // Update image if the active page has an image and it's different
+        // Use a functional update to avoid needing currentImageUrl in dependencies
+        if (activePage && activePage.imageUrl) {
+          setCurrentImageUrl(prevImageUrl => {
+            if (prevImageUrl !== activePage.imageUrl) {
+              return activePage.imageUrl;
+            }
+            return prevImageUrl; // No change needed
+          });
+        } else if (!activePage) {
+            // If no page is active (before the first timestamp), clear the image
+            setCurrentImageUrl(null);
+        }
+      }
+      // --- End Image Synchronization Logic ---
+
+
+      updateScrollPosition(targetScrollTop);
+      setScrollProgress(progress);
+      lastScrollTimeRef.current = timestamp;
+
+      if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
+        animationFrameIdRef.current = requestAnimationFrame(scrollTextAndSyncImage);
+      }
+    };
+
+    // --- Debugging: Check conditions ---
+    console.log(`[NarrativeReader Effect] isPlaying: ${isPlaying}, isPausedByUser: ${!isPausedByUser}, isAutoScrollEnabled: ${isAutoScrollEnabled}`);
+    if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
+      console.log('[NarrativeReader Effect] Conditions met, requesting animation frame.');
+      setIsScrolling(true);
+      if (!animationFrameIdRef.current) { // Avoid duplicate requests
+         animationFrameIdRef.current = requestAnimationFrame(scrollTextAndSyncImage);
+         console.log(`[NarrativeReader Effect] Requested frame ID: ${animationFrameIdRef.current}`);
+      }
+    } else {
+      console.log('[NarrativeReader Effect] Conditions NOT met, cancelling frame (if any).');
+      setIsScrolling(false);
+      if (animationFrameIdRef.current) {
+         cancelAnimationFrame(animationFrameIdRef.current);
+         console.log(`[NarrativeReader Effect] Cancelled frame ID: ${animationFrameIdRef.current}`);
+         animationFrameIdRef.current = null;
+      }
+    }
+    // --- End Debugging ---
+
+    return () => {
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
+    };
+  }, [isPlaying, isPausedByUser, isAutoScrollEnabled, audioInstance, audioDuration, updateScrollPosition, narrativeData]); // Added narrativeData to dependencies
+
+
   // Handler for the Play/Pause button
   const handlePlayPause = () => {
     if (isPlaying && !isPausedByUser) {
@@ -313,7 +409,7 @@ const NarrativeReader = ({
   const handleToggleAutoScroll = () => {
     const newState = !isAutoScrollEnabled;
     setIsAutoScrollEnabled(newState);
-    
+
     if (newState && textContainerRef.current) {
       // When enabling, smoothly scroll to current audio position
       const audioInstance = getAudioInstance();
@@ -321,7 +417,7 @@ const NarrativeReader = ({
         const currentTime = audioInstance.seek ? audioInstance.seek() : audioInstance.currentTime;
         const progress = Math.min(1, Math.max(0, currentTime / audioDuration));
         const targetScrollTop = totalScrollableHeight * progress;
-        
+
         // Smooth scroll with easing
         textContainerRef.current.scrollTo({
           top: targetScrollTop,
@@ -331,7 +427,6 @@ const NarrativeReader = ({
     }
   };
 
-    
 
   if (isLoading) {
     return <div className={styles.loading}>Loading Narrative...</div>;
@@ -355,9 +450,10 @@ const NarrativeReader = ({
       {/* Use a Fragment to return multiple elements */}
       <>
         {/* Image Container - Now outside narrativeBox */}
-        {narrativeData && (
+        {/* Render image only if currentImageUrl is set */}
+        {currentImageUrl && (
           <div className={`${styles.lunarImageContainer} ${imageVisible ? styles.fadeInActive : ''}`}>
-            <img src={backgroundImageUrl} alt="Narrative background" className={styles.lunarImage} />
+            <img src={currentImageUrl} alt="Narrative background" className={styles.lunarImage} /> {/* Use currentImageUrl */}
           </div>
         )}
 
@@ -401,7 +497,7 @@ const NarrativeReader = ({
               <div className={`${styles.scrollIndicator} ${showScrollIndicator ? styles.visible : ''}`}>
                 Auto-scrolling...
               </div>
-              
+
             </div>
           </div>
         )}
