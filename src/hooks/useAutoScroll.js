@@ -8,6 +8,7 @@ const useAutoScroll = ({
   isAutoScrollEnabled,
   totalScrollableHeight,
   audioDuration,
+  onScrollFrame, // Add onScrollFrame callback
   // debounceInterval = 100, // Debounce removed for testing
   snapThreshold = 50
 }) => {
@@ -90,8 +91,13 @@ const useAutoScroll = ({
       }
 
       const currentTime = audioInstance.seek ? audioInstance.seek() : audioInstance.currentTime;
-      // Progress calculation is safe now due to audioDuration > 0 check above
       const progress = Math.min(1, Math.max(0, currentTime / audioDuration));
+
+      // Execute the onScrollFrame callback if provided
+      if (typeof onScrollFrame === 'function') {
+        onScrollFrame(currentTime, progress);
+      }
+
       const targetScrollTop = scrollableHeightRef.current * progress;
 
       // Handle initial scroll jump (Temporarily disabled for testing)
@@ -140,7 +146,7 @@ const useAutoScroll = ({
       }
       // No debounce timeout to clear
     };
-  }, [isPlaying, isPausedByUser, isAutoScrollEnabled, audioInstance, audioDuration, updateScrollPosition]);
+  }, [isPlaying, isPausedByUser, isAutoScrollEnabled, audioInstance, audioDuration, updateScrollPosition, onScrollFrame]); // Add onScrollFrame to dependencies
 
   // Handle manual scroll interruption
   const handleManualScroll = useCallback(() => {

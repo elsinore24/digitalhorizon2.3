@@ -23,12 +23,42 @@ const NarrativeReader = ({
   const [imageVisible, setImageVisible] = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   const audioInstanceRef = useRef(null);
+  const currentAudioInstanceRef = useRef(null); // Ref to store the current audio instance
   const playPauseButtonRef = useRef(null);
   const initialPlayTriggeredRef = useRef(false);
   const textContainerRef = useRef(null);
   const [totalScrollableHeight, setTotalScrollableHeight] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const [currentImageUrl, setCurrentImageUrl] = useState(null); // New state for current image
+
+  // Callback for image synchronization during auto-scroll
+  const syncImageWithScroll = useCallback((currentTime, progress) => {
+    if (narrativeData && narrativeData.pages) {
+      let activePage = null;
+      for (let i = narrativeData.pages.length - 1; i >= 0; i--) {
+        const page = narrativeData.pages[i];
+        if (page.timestamp <= currentTime) {
+          activePage = page;
+          break;
+        }
+      }
+
+      // Update image if the active page has an image and it's different
+      // Use a functional update to avoid needing currentImageUrl in dependencies
+      if (activePage && activePage.imageUrl) {
+        setCurrentImageUrl(prevImageUrl => {
+          if (prevImageUrl !== activePage.imageUrl) {
+            return activePage.imageUrl;
+          }
+          return prevImageUrl; // No change needed
+        });
+      } else if (!activePage) {
+          // If no page is active (before the first timestamp), clear the image
+          setCurrentImageUrl(null);
+      }
+    }
+  }, [narrativeData, setCurrentImageUrl]); // Dependencies for the callback
+
 
   const {
     scrollProgress,
@@ -43,7 +73,8 @@ const NarrativeReader = ({
     isPausedByUser,
     isAutoScrollEnabled,
     totalScrollableHeight,
-    audioDuration
+    audioDuration,
+    onScrollFrame: syncImageWithScroll // Pass the image sync callback
   });
 
   // Effect to fetch narrative data and start audio
@@ -310,88 +341,6 @@ const NarrativeReader = ({
     };
     // Re-run if audio instance changes, narrative changes, or callback changes
   }, [narrativeData, onComplete, getAudioInstance]);
-
-  // Main scroll and image sync effect
-  useEffect(() => {
-    const audioInstance = getAudioInstance();
-    const scrollTextAndSyncImage = (timestamp) => {
-      // Add checks for audioDuration and scrollableHeightRef.current being valid numbers > 0
-      if (!audioInstance || !scrollRef.current || !(scrollableHeightRef.current > 0) || !(audioDuration > 0)) {
-        // console.warn('[useAutoScroll] Missing instance, ref, valid height, or valid duration. Skipping scrollText.');
-        // Request next frame even if skipping calculation, to keep the loop alive if conditions change
-        if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
-           animationFrameIdRef.current = requestAnimationFrame(scrollTextAndSyncImage);
-        }
-        return;
-      }
-
-      const currentTime = audioInstance.seek ? audioInstance.seek() : audioInstance.currentTime;
-      const progress = Math.min(1, Math.max(0, currentTime / audioDuration));
-      const targetScrollTop = scrollableHeightRef.current * progress;
-
-      // --- Image Synchronization Logic ---
-      if (narrativeData && narrativeData.pages) {
-        let activePage = null;
-        for (let i = narrativeData.pages.length - 1; i >= 0; i--) {
-          const page = narrativeData.pages[i];
-          if (page.timestamp <= currentTime) {
-            activePage = page;
-            break;
-          }
-        }
-
-        // Update image if the active page has an image and it's different
-        // Use a functional update to avoid needing currentImageUrl in dependencies
-        if (activePage && activePage.imageUrl) {
-          setCurrentImageUrl(prevImageUrl => {
-            if (prevImageUrl !== activePage.imageUrl) {
-              return activePage.imageUrl;
-            }
-            return prevImageUrl; // No change needed
-          });
-        } else if (!activePage) {
-            // If no page is active (before the first timestamp), clear the image
-            setCurrentImageUrl(null);
-        }
-      }
-      // --- End Image Synchronization Logic ---
-
-
-      updateScrollPosition(targetScrollTop);
-      setScrollProgress(progress);
-      lastScrollTimeRef.current = timestamp;
-
-      if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
-        animationFrameIdRef.current = requestAnimationFrame(scrollTextAndSyncImage);
-      }
-    };
-
-    // --- Debugging: Check conditions ---
-    console.log(`[NarrativeReader Effect] isPlaying: ${isPlaying}, isPausedByUser: ${!isPausedByUser}, isAutoScrollEnabled: ${isAutoScrollEnabled}`);
-    if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
-      console.log('[NarrativeReader Effect] Conditions met, requesting animation frame.');
-      setIsScrolling(true);
-      if (!animationFrameIdRef.current) { // Avoid duplicate requests
-         animationFrameIdRef.current = requestAnimationFrame(scrollTextAndSyncImage);
-         console.log(`[NarrativeReader Effect] Requested frame ID: ${animationFrameIdRef.current}`);
-      }
-    } else {
-      console.log('[NarrativeReader Effect] Conditions NOT met, cancelling frame (if any).');
-      setIsScrolling(false);
-      if (animationFrameIdRef.current) {
-         cancelAnimationFrame(animationFrameIdRef.current);
-         console.log(`[NarrativeReader Effect] Cancelled frame ID: ${animationFrameIdRef.current}`);
-         animationFrameIdRef.current = null;
-      }
-    }
-    // --- End Debugging ---
-
-    return () => {
-      if (animationFrameIdRef.current) {
-        cancelAnimationFrame(animationFrameIdRef.current);
-      }
-    };
-  }, [isPlaying, isPausedByUser, isAutoScrollEnabled, audioInstance, audioDuration, updateScrollPosition, narrativeData]); // Added narrativeData to dependencies
 
 
   // Handler for the Play/Pause button

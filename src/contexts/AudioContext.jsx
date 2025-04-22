@@ -387,10 +387,11 @@ export function AudioProvider({ children }) {
     if (!audioElementRef.current) return false;
     
     try {
+      console.log(`[playAudioWithElementRef] Attempting to set src: ${url}`); // Added logging
       audioElementRef.current.src = url;
       audioRef.current = audioElementRef.current; // Ensure getAudioInstance returns the correct element
       audioElementRef.current.onloadeddata = () => {
-        console.log('Audio loaded:', dialogueId);
+        console.log('[playAudioWithElementRef] Audio loaded:', dialogueId); // Modified logging
         setCurrentDialogue(dialogue);
         
         // Connect analyzer to the audio element
@@ -423,7 +424,7 @@ export function AudioProvider({ children }) {
       };
       
       audioElementRef.current.onerror = (err) => {
-        console.error('Audio error:', err);
+        console.error('[playAudioWithElementRef] Audio error:', err); // Modified logging
         return false;
       };
       
@@ -448,6 +449,7 @@ export function AudioProvider({ children }) {
       
       // Create a hidden audio element specifically for iOS playback
       const iosAudioElement = document.createElement('audio');
+      console.log(`[playAudioWithToneRef] Attempting to set src: ${url}`); // Added logging
       iosAudioElement.src = url;
       iosAudioElement.crossOrigin = 'anonymous';
       iosAudioElement.preload = 'auto';
@@ -595,8 +597,9 @@ export function AudioProvider({ children }) {
 
   // Create a stable reference for the context state change handler
   const handleContextStateChangeRef = useRef((context, pendingPlayback) => {
+    console.log(`[handleContextStateChangeRef] Context state changed to: ${context.state}, pendingPlayback: ${pendingPlayback ? 'Yes' : 'No'}`); // Added logging
     if (context.state === 'running' && pendingPlayback) {
-      console.log('Audio context is running, attempting pending playback:', pendingPlayback.dialogueId || pendingPlayback.url);
+      console.log('[handleContextStateChangeRef] Audio context is running, attempting pending playback:', pendingPlayback.dialogueId || pendingPlayback.url); // Modified logging
       // Call the appropriate playback function based on the stored flag
       if (pendingPlayback.isTone) {
         playAudioWithToneRef.current(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
@@ -725,7 +728,9 @@ export function AudioProvider({ children }) {
 
   // Create a stable reference for playAudioFile
   const playAudioFileRef = useRef(async (filePath) => {
+    console.log(`[playAudioFileRef] Received filePath: ${filePath}`); // Added logging
     if (!filePath) {
+      console.warn('[playAudioFileRef] No filePath provided.'); // Added logging
       return;
     }
 
@@ -734,8 +739,11 @@ export function AudioProvider({ children }) {
     // Check if filePath is a data URI
     if (filePath.startsWith('data:audio/')) {
       url = filePath; // Use the data URI directly
+      console.log(`[playAudioFileRef] Detected data URI, url: ${url.substring(0, 50)}...`); // Added logging
     } else {
-      url = `/${filePath}`; // Construct URL assuming filePath is relative to public root
+      // Construct URL assuming filePath is relative to public root, avoid double slash
+      url = filePath.startsWith('/') ? filePath : `/${filePath}`;
+      console.log(`[playAudioFileRef] Constructed URL: ${url}`); // Added logging
     }
 
     // Placeholder info - might not be needed if playback functions don't rely on it
@@ -767,6 +775,7 @@ export function AudioProvider({ children }) {
 
       // Determine playback method based on iOS or fallback logic
       const isIOSDevice = isIOS; // Capture current value to avoid closure issues
+      console.log(`[playAudioFileRef] isIOSDevice: ${isIOSDevice}`); // Added logging
       if (isIOSDevice) {
         // playAudioWithTone creates its own element and connects analyzer
         playAudioWithToneRef.current(url, filePath, tempDialogueInfo); // Use filePath as ID
