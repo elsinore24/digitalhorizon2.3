@@ -133,7 +133,9 @@ public class NeuralResonanceField : MonoBehaviour
     public Material connectionMaterial; // Base material for LineRenderer
     public Material heatMapMaterial; // Used for Desktop Heatmap Shader or Mobile Mesh
     public GameObject heatMapMeshObject; // Reference to the object holding the mobile heatmap mesh
+    public HeatMapMeshGenerator heatMapGenerator; // Reference to the generator script (can be on the same object as heatMapMeshObject)
     public float networkRadius = 5f; // Overall radius for random node placement
+    public float heatMapInfluenceRadius = 2.0f; // Radius of cursor/region influence on heatmap
 
     [Header("Interaction Settings")]
     public float focusAccumulationSpeed = 1.0f;
@@ -299,7 +301,9 @@ public class NeuralResonanceField : MonoBehaviour
             NeuralNode node = nodeObj.GetComponent<NeuralNode>();
             if (node != null)
             {
-                node.Initialize(regionIndex);
+                // Get the color for the region, or default white if no region
+                Color nodeColor = (regionIndex >= 0 && regionIndex < decisionRegions.Count) ? decisionRegions[regionIndex].regionColor : Color.white;
+                node.Initialize(regionIndex, nodeColor);
                 nodes.Add(node);
             }
             else
@@ -526,8 +530,16 @@ public class NeuralResonanceField : MonoBehaviour
                 // Node colors are likely handled within NeuralNode.SetActivationLevel based on its logic
                 break;
             case VisualizationMode.MeshHeatMap:
-                // TODO: Update vertex colors of the heatMapMeshObject based on cursorPosition and regionFocusLevels
-                // Example: UpdateHeatmapMeshColors();
+                if (heatMapGenerator != null)
+                {
+                    // Update vertex colors of the heatmap mesh
+                    // Pass cursor position, region data, focus levels, a default (clear) color, and influence radius
+                    heatMapGenerator.UpdateVertexColors(cursorPosition, decisionRegions, regionFocusLevels, Color.clear, heatMapInfluenceRadius);
+                }
+                else if (heatMapMeshObject != null) // Fallback check if generator wasn't assigned but object exists
+                {
+                     Debug.LogWarning("HeatMapMeshObject is assigned, but HeatMapMeshGenerator component reference is missing.", this);
+                }
                 break;
             case VisualizationMode.FullShader:
                 // TODO: Update heatMapMaterial shader properties
@@ -612,19 +624,22 @@ public class NeuralResonanceField : MonoBehaviour
         float maxRadius = networkRadius * 1.5f; // Ensure wave covers the whole area
         float waveSpeed = networkRadius * 1.5f; // Adjust speed as needed
         float waveThickness = 0.75f; // How wide the pulsing band is
+        float rippleDuration = maxRadius / waveSpeed; // Duration of the ripple effect
 
         // --- Ripple Effect ---
-        float currentRadius = 0f;
-        while (currentRadius < maxRadius)
+        float timer = 0f;
+        while (timer < rippleDuration)
         {
-            currentRadius += Time.deltaTime * waveSpeed;
+            timer += Time.deltaTime;
+            float currentRadius = Mathf.Lerp(0f, maxRadius, timer / rippleDuration);
 
             // Update shader parameters for wave effect (Mode 3: FullShader)
             if (currentVisualizationMode == VisualizationMode.FullShader && heatMapMaterial != null)
             {
+                 // TODO: Implement shader uniform updates for wave effect
                  // heatMapMaterial.SetFloat("_WaveRadius", currentRadius);
                  // heatMapMaterial.SetVector("_WaveOrigin", center);
-                 // Debug.Log($"Wave Radius: {currentRadius}"); // Shader implementation needed
+                 // heatMapMaterial.SetColor("_WaveColor", pulseColor); // Optional: Pass region color to shader
             }
 
             // Trigger pulse on nodes as the wave passes through (All Modes)
@@ -637,7 +652,7 @@ public class NeuralResonanceField : MonoBehaviour
                 {
                     // Trigger the pulse effect on the node
                     node.Pulse(pulseColor);
-                    // Optional: Play a subtle sound per node pulse?
+                    // Optional: Play a subtle sound per node pulse? audioSystem.PlayRegionPulseSound(node.regionIndex);
                 }
             }
 
@@ -647,15 +662,17 @@ public class NeuralResonanceField : MonoBehaviour
          // Reset wave shader parameters if used
          if (currentVisualizationMode == VisualizationMode.FullShader && heatMapMaterial != null)
          {
+              // TODO: Reset shader uniforms after wave
               // heatMapMaterial.SetFloat("_WaveRadius", -1f); // Indicate wave finished
          }
 
 
         // --- Fade Out Non-Selected & Highlight Selected ---
         float fadeDuration = 0.75f; // Duration of the fade effect
-        float timer = 0f;
+        timer = 0f;
 
         // Store initial activation levels for lerping the selected region
+        // This is done to ensure a smooth transition from the current activation level
         List<float> initialSelectedActivations = new List<float>();
          foreach (NeuralNode node in nodes)
          {
@@ -664,7 +681,7 @@ public class NeuralResonanceField : MonoBehaviour
                  initialSelectedActivations.Add(node.activationLevel);
              }
          }
-         int selectedNodeIndex = 0;
+         int selectedNodeCounter = 0; // Counter to match initial activations list
 
 
         while (timer < fadeDuration)
@@ -672,7 +689,7 @@ public class NeuralResonanceField : MonoBehaviour
             timer += Time.deltaTime;
             float progress = Mathf.Clamp01(timer / fadeDuration);
 
-            selectedNodeIndex = 0; // Reset index for each frame
+            selectedNodeCounter = 0; // Reset counter for each frame
             foreach (NeuralNode node in nodes)
             {
                  if (node == null) continue;
@@ -684,13 +701,14 @@ public class NeuralResonanceField : MonoBehaviour
                 }
                 else
                 {
-                    // Optionally, enhance the selected region nodes (e.g., brighten, hold activation)
-                    if(selectedNodeIndex < initialSelectedActivations.Count)
+                    // Enhance the selected region nodes (e.g., brighten, hold activation)
+                    if(selectedNodeCounter < initialSelectedActivations.Count)
                     {
-                        node.SetActivationLevel(Mathf.Lerp(initialSelectedActivations[selectedNodeIndex], 1.0f, progress)); // Lerp towards full activation
-                        selectedNodeIndex++;
+                        // Lerp activation towards 1.0 (full brightness/prominence)
+                        node.SetActivationLevel(Mathf.Lerp(initialSelectedActivations[selectedNodeCounter], 1.0f, progress));
+                        selectedNodeCounter++;
                     }
-                    node.SetFade(1f); // Ensure selected nodes remain visible
+                    node.SetFade(1f); // Ensure selected nodes remain fully visible
                 }
             }
 
@@ -709,7 +727,24 @@ public class NeuralResonanceField : MonoBehaviour
             yield return null;
         }
 
-        // --- Final Delay & Transition ---
+        // --- Final State & Transition ---
+        // Ensure selected nodes are fully activated and non-selected are fully faded
+         foreach (NeuralNode node in nodes)
+         {
+              if (node == null) continue;
+             if (node.regionIndex != regionIndex)
+             {
+                 node.SetFade(0f); // Ensure fully transparent
+             }
+             else
+             {
+                 node.SetActivationLevel(1.0f); // Ensure fully activated
+                 node.SetFade(1f); // Ensure fully visible
+             }
+         }
+         // Ensure non-selected connections are fully faded (if implemented)
+
+
         yield return new WaitForSeconds(1.0f); // Hold the final state briefly
 
         // --- Placeholder ---
