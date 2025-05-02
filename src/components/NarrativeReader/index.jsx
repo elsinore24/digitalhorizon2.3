@@ -139,15 +139,14 @@ const NarrativeReader = ({
         setNarrativeData(data);
 
         // Check if the loaded narrative data corresponds to a tuning challenge
-        if (data.requiresTuning) {
-            const challengeConfig = {
-                id: data.tuningChallengeId, // e.g., 'LunarSignal1'
-                // Pass specific parameters if needed, or let SignalTuningInterface fetch based on ID
-                baseNoise: data.tuningBaseNoise,
-                interpretations: data.tuningInterpretations,
-             };
-            setActiveTuningChallenge(challengeConfig);
-            console.log("Setting active tuning challenge:", challengeConfig);
+        if (data.requiresTuning && data.challengeConfig) {
+            // Stop any currently playing audio before starting the challenge
+            stopAudio();
+            // Set the active tuning challenge in the game store
+            setActiveTuningChallenge(data.challengeConfig);
+            console.log("Setting active tuning challenge:", data.challengeConfig);
+            // Do NOT proceed with audio playback or narrative display here
+            return;
         } else {
             // If not a tuning challenge, ensure activeTuningChallenge is null
             setActiveTuningChallenge(null);
@@ -165,9 +164,40 @@ const NarrativeReader = ({
 
         if (data.audio) {
            console.log('[NarrativeReader] Narrative fetched, loading audio:', data.audio);
-           playAudioFile(data.audio);
+           // Define the completion callback
+           const handleAudioCompletion = () => {
+             console.log('[NarrativeReader] Audio playback finished (callback). Checking for next narrative node.');
+
+             // Get the latest state using get() from Zustand
+             const state = useGameStore.getState();
+             const currentGameState = state.gameState;
+
+             // Determine the next node ID based on the 'next' property in the narrative data
+             const nextNodeId = data?.next; // Use 'data' from the fetch scope
+
+             if (!nextNodeId) {
+                 console.warn(`[NarrativeReader] Narrative node ${currentGameState.currentNodeId} has no 'next' property. Narrative ends here.`);
+                 // Optionally handle narrative ending (e.g., show credits, return to main menu)
+                 return; // Stop narrative progression
+             }
+
+             console.log(`[NarrativeReader] Advancing to next node: ${nextNodeId}`);
+
+             // Update currentNodeId in Zustand
+             updateGameState({ currentNodeId: nextNodeId });
+           };
+
+           // Play the audio file and pass the completion callback
+           playAudioFile(data.audio, handleAudioCompletion);
         } else {
           console.warn(`Narrative ${narrativeToLoad} is missing the 'audio' property in its JSON data.`);
+          // If there's no audio, immediately trigger narrative advancement if 'next' exists
+          if (data?.next) {
+             console.log('[NarrativeReader] No audio, immediately advancing to next node:', data.next);
+             updateGameState({ currentNodeId: data.next });
+          } else {
+             console.warn(`[NarrativeReader] Narrative node ${narrativeToLoad} has no audio and no 'next' property. Narrative ends here.`);
+          }
         }
 
       } catch (e) {
@@ -179,7 +209,7 @@ const NarrativeReader = ({
     };
 
     fetchNarrative();
-  }, [narrativeToLoad, playAudioFile, stopAudio, setActiveTuningChallenge]); // Depend on narrativeToLoad, playAudioFile, stopAudio, and setActiveTuningChallenge
+  }, [narrativeToLoad, playAudioFile, stopAudio, setActiveTuningChallenge, updateGameState]); // Add updateGameState to dependencies
 
   // Effect to calculate total scrollable height after narrative data is loaded and rendered
   useLayoutEffect(() => { // Changed to useLayoutEffect
@@ -341,54 +371,54 @@ const NarrativeReader = ({
     initialPlayTriggeredRef.current = false;
   }, [narrativeToLoad]); // Depend on narrativeToLoad
 
-  // Effect for handling narrative completion
+  // Ref to track if narrative advancement is pending to prevent double triggers
+  const narrativeAdvancementPendingRef = useRef(false);
+
+  // Effect to handle narrative completion based on audio playback state
   useEffect(() => {
-    const audioInstance = getAudioInstance(); // Use getAudioInstance to get the current instance
-    // Check if audioInstance and narrativeData are available
-    if (!audioInstance || !narrativeData) {
-      return; // Exit if no audio or data
-    }
-
-    const handleAudioEnd = () => {
-      console.log('[NarrativeReader] Audio ended. Advancing narrative.');
-      // Get the latest state using get() from Zustand
-      const state = useGameStore.getState();
-      const currentGameState = state.gameState;
-
-      // TODO: Determine the next node ID based on narrative logic/choices
-      // For now, we'll use a placeholder or logic based on the *current* node if needed
-      // const nextNodeId = determineNextNode(currentGameState.currentNodeId); // Example logic
-      const nextNodeId = 'next_narrative_node'; // Placeholder - replace with actual logic
-
-      // Update currentNodeId in Zustand
-      updateGameState({ currentNodeId: nextNodeId });
-    };
-
-    // Howler uses 'end', HTMLAudioElement uses 'ended'
-    const eventName = 'end'; // Assuming useAudio provides a Howler instance or similar event emitter
-
-    // Ensure addEventListener/removeEventListener exist on the instance
-    if (typeof audioInstance.addEventListener === 'function' && typeof audioInstance.removeEventListener === 'function') {
-       audioInstance.addEventListener(eventName, handleAudioEnd);
-    } else if (typeof audioInstance.on === 'function' && typeof audioInstance.off === 'function') {
-       // Handle cases where it might use .on/.off (like Howler v2)
-       audioInstance.on(eventName, handleAudioEnd);
-    } else {
-       console.warn('[NarrativeReader] Audio instance does not support standard event listeners (addEventListener/on). Cannot track end.');
-       return; // Cannot proceed without event listeners
-    }
-
-    return () => {
+    // Check if audio is not playing, narrative data is loaded, and audio duration is known
+    if (!isPlaying && narrativeData && audioDuration > 0 && !narrativeAdvancementPendingRef.current) {
+      const audioInstance = getAudioInstance();
       if (audioInstance) {
-        if (typeof audioInstance.removeEventListener === 'function') {
-           audioInstance.removeEventListener(eventName, handleAudioEnd);
-        } else if (typeof audioInstance.off === 'function') {
-           audioInstance.off(eventName, handleAudioEnd);
+        // Get current time using the appropriate method
+        const currentTime = audioInstance.seek ? audioInstance.seek() : audioInstance.currentTime;
+        const timeTolerance = 0.1; // Small tolerance for floating point comparison
+
+        // Check if current time is close to the end of the audio
+        if (Math.abs(currentTime - audioDuration) < timeTolerance || currentTime >= audioDuration) {
+          console.log('[NarrativeReader] Audio playback finished. Checking for next narrative node.');
+
+          // Set the pending flag to true immediately
+          narrativeAdvancementPendingRef.current = true;
+
+          // Get the latest state using get() from Zustand
+          const state = useGameStore.getState();
+          const currentGameState = state.gameState;
+
+          // Determine the next node ID based on the 'next' property in the narrative data
+          const nextNodeId = narrativeData?.next;
+
+          if (!nextNodeId) {
+              console.warn(`[NarrativeReader] Narrative node ${currentGameState.currentNodeId} has no 'next' property. Narrative ends here.`);
+              // Optionally handle narrative ending (e.g., show credits, return to main menu)
+              narrativeAdvancementPendingRef.current = false; // Reset flag if narrative ends
+              return; // Stop narrative progression
+          }
+
+          console.log(`[NarrativeReader] Advancing to next node: ${nextNodeId}`);
+
+          // Update currentNodeId in Zustand
+          updateGameState({ currentNodeId: nextNodeId });
+
+          // Reset the pending flag after a short delay to allow state update to propagate
+          // This helps prevent the effect from re-triggering immediately on state change
+          setTimeout(() => {
+            narrativeAdvancementPendingRef.current = false;
+          }, 500); // Adjust delay as needed
         }
       }
-    };
-    // Re-run if audio instance changes, narrative changes, or updateGameState changes
-  }, [narrativeData, getAudioInstance, updateGameState]);
+    }
+  }, [isPlaying, audioDuration, getAudioInstance, narrativeData, updateGameState]); // Depend on isPlaying, audioDuration, getAudioInstance, narrativeData, and updateGameState
 
 
   // Handler for the Play/Pause button

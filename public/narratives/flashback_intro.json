@@ -38,5 +38,6 @@
       "imageUrl": "/front_pic/pic7.jpg"
     }
   ],
-  "generation_method": "rag"
+  "generation_method": "rag",
+  "next": "Chapter1_NeuralMergeSequence"
 }

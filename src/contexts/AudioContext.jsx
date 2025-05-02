@@ -726,13 +726,19 @@ export function AudioProvider({ children }) {
   //   }
   // }, [isIOS, playAudioWithElement, playAudioWithTone]);
 
+  // Ref to store the audio completion callback
+  const audioCompletionCallbackRef = useRef(null);
+
   // Create a stable reference for playAudioFile
-  const playAudioFileRef = useRef(async (filePath) => {
+  const playAudioFileRef = useRef(async (filePath, onComplete) => { // Accept onComplete callback
     console.log(`[playAudioFileRef] Received filePath: ${filePath}`); // Added logging
     if (!filePath) {
       console.warn('[playAudioFileRef] No filePath provided.'); // Added logging
       return;
     }
+
+    // Store the completion callback
+    audioCompletionCallbackRef.current = onComplete;
 
     initAudioContext(); // Ensure context is initialized and try resuming if suspended
     let url;
@@ -792,12 +798,17 @@ export function AudioProvider({ children }) {
       setIsPlaying(false);
       setCurrentTrack(null);
       setCurrentDialogue(null);
+      // Call the completion callback on error as well
+      if (audioCompletionCallbackRef.current) {
+          audioCompletionCallbackRef.current();
+          audioCompletionCallbackRef.current = null; // Clear the callback after calling
+      }
     }
   });
-  
+
   // Wrapper function to maintain API compatibility
-  const playAudioFile = useCallback((filePath) => {
-    return playAudioFileRef.current(filePath);
+  const playAudioFile = useCallback((filePath, onComplete) => { // Accept onComplete callback
+    return playAudioFileRef.current(filePath, onComplete);
   }, []); // No dependencies needed since we're using refs
 
   // Create a stable reference for preloadAudioFile

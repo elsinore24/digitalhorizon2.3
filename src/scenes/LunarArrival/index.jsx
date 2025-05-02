@@ -115,7 +115,7 @@ const LunarArrival = ({ dataPerceptionMode }) => {
           <NarrativeReader
             narrativeToLoad={flashbackNarrativeId} // Pass the narrative ID as a prop
             backgroundImageUrl={labBackgroundImage} // Use placeholder image
-            onComplete={handleNarrativeComplete}
+            // Removed onComplete prop to allow NarrativeReader to handle progression via 'next' property
           />
         </div>
       )}

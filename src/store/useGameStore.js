@@ -156,11 +156,11 @@ export const useGameStore = create((set, get) => ({
         let pointsUpdate = { Enlightenment: 0, Trust: 0, Witness: 0, Reality: 0 };
         let indicatorUpdate = { NeuralStability: 0 }; // Change relative to current
 
-        // Example logic for the first signal tuning choice:
-        if (currentNodeId === 'Chapter1_SignalTuning1') { // Assuming this is the ID for the tuning node
+        // Logic for the first signal tuning challenge:
+        if (currentNodeId === 'Chapter1_LunarSignalAnalysisIntro') {
             if (chosenInterpretationId === 'A') {
                 nextNodeId = 'Chapter1_PathA_Result';
-                pointsUpdate = { Enlightenment: 2, Trust: -1, Reality: 3 };
+                pointsUpdate = { Enlightenment: 2, Trust: -1, Reality: 3, Witness: 0 };
                 indicatorUpdate = { NeuralStability: 0.01 };
             } else if (chosenInterpretationId === 'B') {
                 nextNodeId = 'Chapter1_PathB_Result';
@@ -168,7 +168,7 @@ export const useGameStore = create((set, get) => ({
                 indicatorUpdate = { NeuralStability: -0.01 }; // Net effect after lock
             } else if (chosenInterpretationId === 'C') {
                 nextNodeId = 'Chapter1_PathC_Result';
-                pointsUpdate = { Enlightenment: -3, Trust: 1, Reality: 5 };
+                pointsUpdate = { Enlightenment: -3, Trust: 1, Reality: 5, Witness: 0 };
                 indicatorUpdate = { NeuralStability: 0.02 };
             }
         }

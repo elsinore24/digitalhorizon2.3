@@ -1,0 +1,74 @@
+{
+  "id": "Chapter1_LunarSignalAnalysisIntro",
+  "audio": null,
+  "pages": [
+    {
+      "text": "Alara's voice fills your mind. 'Accessing Armstrong Base sensors... I've isolated a faint signal from the Tau Ceti system. Analysis required.'",
+      "timestamp": 0
+    }
+  ],
+  "requiresTuning": true,
+  "challengeConfig": {
+    "challengeId": "LunarSignal1",
+    "baseSignalStrength": "Very Low",
+    "noiseLevel": "Moderately High",
+    "stabilityLockThreshold": 0.85,
+    "witnessCueTriggerEnabled": true,
+    "interpretations": [
+      {
+        "id": "A",
+        "descriptionHint": "Mathematical Precision",
+        "targetFrequencyRange": "Narrow Band",
+        "phaseAlignment": "Critical",
+        "filterRequirement": "Moderate",
+        "tuningDifficulty": "Moderate",
+        "stabilityBehavior": "Rises smoothly and locks cleanly once parameters are correct. Low fluctuation near lock.",
+        "hiddenPointImpact": {
+          "Enlightenment": 2,
+          "Trust": -1,
+          "Reality": 3,
+          "Witness": 0
+        },
+        "visibleIndicatorImpact": {
+          "NeuralStability": 1
+        }
+      },
+      {
+        "id": "B",
+        "descriptionHint": "Source Signature",
+        "targetFrequencyRange": "Broader Band",
+        "phaseAlignment": "Less critical than A, but still influences clarity.",
+        "filterRequirement": "High",
+        "tuningDifficulty": "High",
+        "stabilityBehavior": "Rises erratically, fluctuates significantly even when close to optimal tuning. Harder to reach and maintain the lock threshold.",
+        "hiddenPointImpact": {
+          "Enlightenment": 5,
+          "Trust": 2,
+          "Witness": 1,
+          "Reality": -2
+        },
+        "visibleIndicatorImpact": {
+          "NeuralStability": -1
+        }
+      },
+      {
+        "id": "C",
+        "descriptionHint": "Instrumental Artifact",
+        "targetFrequencyRange": "Very Broad, Low Frequency",
+        "phaseAlignment": "Not critical",
+        "filterRequirement": "Low",
+        "tuningDifficulty": "Low",
+        "stabilityBehavior": "Rises very quickly and locks easily above the threshold. Very stable.",
+        "hiddenPointImpact": {
+          "Enlightenment": -3,
+          "Trust": 1,
+          "Reality": 5,
+          "Witness": 0
+        },
+        "visibleIndicatorImpact": {
+          "NeuralStability": 2
+        }
+      }
+    ]
+  }
+}

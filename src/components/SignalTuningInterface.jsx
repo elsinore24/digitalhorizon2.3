@@ -133,6 +133,67 @@ function renderSignalDisplay(ctx, canvas, tuningState, dominantInterpretation, s
   // }
 }
 
+// Helper function to calculate stability for a given interpretation
+function calculateInterpretationStability(currentTuning, interpretation) {
+    let score = 0;
+    const { frequency, amplitude, phase, filterStrength } = currentTuning;
+    const { targetFrequencyRange, phaseAlignment, filterRequirement, tuningDifficulty } = interpretation;
+
+    // Frequency match (simplified)
+    if (Array.isArray(targetFrequencyRange)) {
+        if (frequency >= targetFrequencyRange[0] && frequency <= targetFrequencyRange[1]) {
+            score += 30; // Base score for being in range
+            // Add more score based on how close to the center of a narrow band
+            if (targetFrequencyRange[1] - targetFrequencyRange[0] < 20) { // Example: Narrow band
+                 const center = (targetFrequencyRange[0] + targetFrequencyRange[1]) / 2;
+                 score += (1 - Math.abs(frequency - center) / (targetFrequencyRange[1] - center)) * 20;
+            }
+        }
+    } else if (typeof targetFrequencyRange === 'string') {
+        // Handle conceptual ranges like "Very Broad, Low Frequency"
+        if (targetFrequencyRange === "Very Broad, Low Frequency" && frequency < 50) score += 40;
+        // Add other conceptual range checks
+    }
+
+
+    // Amplitude match (simplified)
+    // Assuming ideal amplitude ranges based on conceptual descriptions
+    if (interpretation.id === 'A' && amplitude >= 40 && amplitude <= 60) score += 20;
+    if (interpretation.id === 'B' && amplitude >= 60 && amplitude <= 80) score += 20;
+    if (interpretation.id === 'C' && amplitude >= 20 && amplitude <= 40) score += 20;
+
+
+    // Phase alignment (simplified)
+    if (phaseAlignment === 'Critical') {
+        const phaseDiff = Math.abs(phase - 0); // Assuming ideal phase is 0 or 360
+        score += (1 - Math.min(1, phaseDiff / 180)) * 30; // Higher score for closer phase
+    } else if (phaseAlignment === 'Less critical than A, but still influences clarity.') {
+         const phaseDiff = Math.abs(phase - 0);
+         score += (1 - Math.min(1, phaseDiff / 180)) * 15; // Less impact than critical
+    }
+
+
+    // Filter requirement (simplified)
+    if (filterRequirement === 'High' && filterStrength > 70) score += 30;
+    else if (filterRequirement === 'Moderate' && filterStrength > 40 && filterStrength < 80) score += 20;
+    else if (filterRequirement === 'Low' && filterStrength < 30) score += 10;
+
+
+    // Adjust score based on difficulty (conceptual - might need refinement)
+    if (tuningDifficulty === 'High') score *= 0.8; // Make it harder to get high stability
+    else if (tuningDifficulty === 'Low') score *= 1.2; // Make it easier
+
+    // Add some randomness for erratic behavior (Interpretation B)
+    if (interpretation.id === 'B') {
+        score += (Math.random() - 0.5) * 10; // Add random fluctuation
+    }
+
+
+    // Clamp score between 0 and 100
+    return Math.max(0, Math.min(100, score));
+}
+
+
 // Accept challengeConfig as a prop
 function SignalTuningInterface({ advanceNarrative, challengeConfig }) {
   const canvasRef = useRef(null); // Create a ref for the canvas
@@ -199,22 +260,16 @@ function SignalTuningInterface({ advanceNarrative, challengeConfig }) {
         filterStrength: tuningFilterStrength,
       };
 
-      // Calculate stability for each interpretation using data from challengeConfig
-      for (const key in interpretations) {
-        const interpretation = interpretations[key];
-        // Calculate stability using the interpretation's specific logic
-        // Assuming stabilityCalculationLogic is defined within each interpretation object in challengeConfig
-        if (interpretation.stabilityCalculationLogic) {
-             const interpretationStability = interpretation.stabilityCalculationLogic(currentTuning, interpretation);
+      // Calculate stability for each interpretation using the helper function
+      for (const interpretation of interpretations) {
+           const interpretationStability = calculateInterpretationStability(currentTuning, interpretation);
 
-             if (interpretationStability > maxStability) {
-               maxStability = interpretationStability;
-               currentDominantInterpretation = key;
-             }
-        } else {
-            console.warn(`Interpretation ${key} is missing stabilityCalculationLogic.`);
-        }
+           if (interpretationStability > maxStability) {
+             maxStability = interpretationStability;
+             currentDominantInterpretation = interpretation.id;
+           }
       }
+
 
       setStability(maxStability); // Update overall stability state
       setDominantInterpretation(currentDominantInterpretation); // Update dominant interpretation state
@@ -238,15 +293,21 @@ function SignalTuningInterface({ advanceNarrative, challengeConfig }) {
         }
 
         // Update oscillator frequency based on dominant interpretation's target frequency range
-        if (currentDominantInterpretation && interpretations[currentDominantInterpretation]?.targetFrequencyRange) {
-          const targetInterpretation = interpretations[currentDominantInterpretation];
-          // Use the lower bound of the frequency range as the base frequency for audio
-          oscillatorRef.current.frequency.setValueAtTime(targetInterpretation.targetFrequencyRange[0] * 10, audioContext.currentTime); // Adjust frequency scaling
-          // TODO: Implement more complex audio logic based on audioCueLogic
+        if (currentDominantInterpretation) {
+          const targetInterpretation = interpretations.find(int => int.id === currentDominantInterpretation);
+          if (targetInterpretation && Array.isArray(targetInterpretation.targetFrequencyRange)) {
+             // Use the lower bound of the frequency range as the base frequency for audio
+             oscillatorRef.current.frequency.setValueAtTime(targetInterpretation.targetFrequencyRange[0] * 10, audioContext.currentTime); // Adjust frequency scaling
+             // TODO: Implement more complex audio logic based on audioCueLogic
+          } else {
+             // Default audio frequency if no dominant interpretation or target frequency range
+             oscillatorRef.current.frequency.setValueAtTime(tuningFrequency * 10, audioContext.currentTime); // Adjust frequency scaling
+          }
         } else {
-          // Default audio frequency if no dominant interpretation or target frequency range
-          oscillatorRef.current.frequency.setValueAtTime(tuningFrequency * 10, audioContext.currentTime); // Adjust frequency scaling
+             // Default audio frequency if no dominant interpretation
+             oscillatorRef.current.frequency.setValueAtTime(tuningFrequency * 10, audioContext.currentTime); // Adjust frequency scaling
         }
+
 
         // Update gain based on overall stability (higher stability = louder sound)
         gainNodeRef.current.gain.setValueAtTime(maxStability / 100 * 0.5, audioContext.currentTime); // Scale stability to gain (max 0.5)
@@ -290,24 +351,24 @@ function SignalTuningInterface({ advanceNarrative, challengeConfig }) {
     }
 
     const interpretations = challengeConfig.interpretations;
-    const currentInterpretation = interpretations[dominantInterpretation];
+    const currentInterpretation = interpretations.find(int => int.id === dominantInterpretation);
 
-    // Check if the dominant interpretation's stability is above its threshold
-    if (currentInterpretation && stability >= currentInterpretation.stabilityThreshold && !isTuned) {
+    // Check if the dominant interpretation's stability is above the challenge threshold
+    if (currentInterpretation && stability >= challengeConfig.stabilityLockThreshold * 100 && !isTuned) { // Multiply threshold by 100 as stability is 0-100
       setIsTuned(true); // Mark as tuned to prevent re-triggering
-      console.log(`Signal tuned to: ${currentInterpretation.name}`);
+      console.log(`Signal tuned to: ${currentInterpretation.id}`);
 
       // Update game state based on the locked interpretation
       updateGameState(prevState => {
         const newHiddenPoints = { ...prevState.hiddenPointScores };
-        for (const key in currentInterpretation.hiddenPointImpacts) {
-          newHiddenPoints[key] = (newHiddenPoints[key] || 0) + currentInterpretation.hiddenPointImpacts[key];
+        for (const key in currentInterpretation.hiddenPointImpact) { // Corrected property name
+          newHiddenPoints[key] = (newHiddenPoints[key] || 0) + currentInterpretation.hiddenPointImpact[key];
         }
 
         const newVisibleIndicators = { ...prevState.visibleIndicatorValues };
-        for (const key in currentInterpretation.visibleIndicatorImpacts) {
+        for (const key in currentInterpretation.visibleIndicatorImpact) { // Corrected property name
            // Assuming visible indicators are numbers that need to be adjusted
-          newVisibleIndicators[key] = (newVisibleIndicators[key] || 0) + currentInterpretation.visibleIndicatorImpacts[key];
+          newVisibleIndicators[key] = (newVisibleIndicators[key] || 0) + currentInterpretation.visibleIndicatorImpact[key];
         }
 
         return {
@@ -320,8 +381,8 @@ function SignalTuningInterface({ advanceNarrative, challengeConfig }) {
       // Save game state
       saveGameStateToServer();
 
-      // TODO: Trigger Witness cue if dominantInterpretation is B
-      if (currentInterpretation.witnessCueTrigger) {
+      // Trigger Witness cue if enabled for this challenge and dominant interpretation is B
+      if (challengeConfig.witnessCueTriggerEnabled && dominantInterpretation === 'B') {
         triggerWitnessCue(); // Call the Witness cue function
       }
 
@@ -345,17 +406,17 @@ function SignalTuningInterface({ advanceNarrative, challengeConfig }) {
           <div className={styles.stabilityGaugeBarBackground}>
               <div
                   className={`${styles.stabilityGaugeBarFill} ${
-                      dominantInterpretation && challengeConfig?.interpretations[dominantInterpretation]?.stabilityThreshold && stability > challengeConfig.interpretations[dominantInterpretation].stabilityThreshold * 0.9 && stability < challengeConfig.interpretations[dominantInterpretation].stabilityThreshold
+                      dominantInterpretation && challengeConfig?.stabilityLockThreshold && stability > challengeConfig.stabilityLockThreshold * 100 * 0.9 && stability < challengeConfig.stabilityLockThreshold * 100
                           ? styles.nearingThreshold
                           : ''
                   }`}
                   style={{ width: `${Math.min(stability, 100)}%` }} // Fill based on stability (0-100)
               ></div>
               {/* Optional: Mark the threshold */}
-              {dominantInterpretation && challengeConfig?.interpretations[dominantInterpretation]?.stabilityThreshold && (
+              {challengeConfig?.stabilityLockThreshold && (
                 <div
                     className={styles.stabilityGaugeThresholdMarker}
-                    style={{ left: `${challengeConfig.interpretations[dominantInterpretation].stabilityThreshold}%` }}
+                    style={{ left: `${challengeConfig.stabilityLockThreshold * 100}%` }} // Multiply threshold by 100
                 ></div>
               )}
           </div>
