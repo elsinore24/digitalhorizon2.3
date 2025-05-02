@@ -1,0 +1,87 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+.displayArea {
+  width: 100%;
+  height: 200px; /* Placeholder height for the visualizer */
+  border: 1px solid #eee;
+  margin-bottom: 20px;
+  background-color: #000; /* Dark background for visuals */
+}
+
+.controls {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+}
+
+.controlGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Stability Gauge Styles */
+.stabilityGaugeContainer {
+  width: 80%; /* Or desired width */
+  margin: 10px auto;
+  text-align: center;
+}
+
+.stabilityGaugeLabel {
+  font-size: 0.8em;
+  color: #ccc;
+  margin-bottom: 4px;
+}
+
+.stabilityGaugeBarBackground {
+  height: 15px;
+  background-color: #333; /* Dark background */
+  border-radius: 7px;
+  position: relative;
+  overflow: hidden; /* Keep fill inside */
+  border: 1px solid #555;
+}
+
+.stabilityGaugeValue {
+    font-size: 0.9em;
+    color: #eee;
+    margin-top: 4px;
+}
+
+.stabilityGaugeBarFill.nearingThreshold {
+    background-color: #f5a623; /* Change color to orange/yellow */
+    animation: pulse-warning 0.7s infinite alternate; /* Add pulsing effect */
+}
+
+@keyframes pulse-warning {
+    from { opacity: 1; }
+    to { opacity: 0.7; }
+}
+
+.stabilityGaugeBarFill {
+  height: 100%;
+  background-color: #4a90e2; /* Blue fill color */
+  border-radius: 7px;
+  transition: width 0.1s linear; /* Smooth fill animation */
+  /* Add gradient or other effects if desired */
+}
+
+.stabilityGaugeThresholdMarker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: rgba(255, 255, 255, 0.5); /* Semi-transparent white line */
+  /* 'left' is set inline via style prop */
+}
+
+

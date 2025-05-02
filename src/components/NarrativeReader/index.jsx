@@ -3,11 +3,20 @@ import useAudio from '../../hooks/useAudio';
 import useAutoScroll from '../../hooks/useAutoScroll';
 import styles from './NarrativeReader.module.scss';
 
+import { useGameStore } from '../../store/useGameStore'; // Import useGameStore as a named import
+
+// Remove narrativeId and onComplete props, use dataPerceptionMode
 const NarrativeReader = ({
-  narrativeId,
   dataPerceptionMode,
-  onComplete,
+  narrativeToLoad, // Accept the new prop
 }) => {
+  // Access currentNodeId, updateGameState, and setActiveTuningChallenge from Zustand store
+  const { currentNodeId, updateGameState, setActiveTuningChallenge } = useGameStore(state => ({
+    currentNodeId: state.gameState.currentNodeId,
+    updateGameState: state.updateGameState,
+    setActiveTuningChallenge: state.setActiveTuningChallenge,
+  }));
+
   const [narrativeData, setNarrativeData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,7 +25,8 @@ const NarrativeReader = ({
     pauseAudio,
     resumeAudio,
     isPlaying,
-    getAudioInstance
+    getAudioInstance,
+    stopAudio // Add stopAudio from useAudio
   } = useAudio();
   const [isPausedByUser, setIsPausedByUser] = useState(false);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
@@ -77,9 +87,32 @@ const NarrativeReader = ({
     onScrollFrame: syncImageWithScroll // Pass the image sync callback
   });
 
-  // Effect to fetch narrative data and start audio
+  // Effect to fetch narrative data and start audio based on narrativeToLoad prop
   useEffect(() => {
-    // Reset state when narrativeId changes or is null
+    console.log('[NarrativeReader useEffect] Triggered. narrativeToLoad:', narrativeToLoad); // Update log
+
+    // Only attempt to fetch if narrativeToLoad is provided
+    if (!narrativeToLoad) {
+      // Reset state if narrativeToLoad becomes null (e.g., when component unmounts or phase changes)
+      setNarrativeData(null);
+      setIsPausedByUser(false); // Reset pause state
+      setImageVisible(false); // Reset image visibility
+      setTotalScrollableHeight(0); // Reset scroll height
+      setAudioDuration(0); // Reset audio duration
+      setCurrentImageUrl(null); // Reset current image
+
+      // If there's an active audio instance from a previous narrative, stop it
+      if (audioInstanceRef.current && typeof audioInstanceRef.current.pause === 'function') {
+         audioInstanceRef.current.pause();
+         audioInstanceRef.current.src = ''; // Detach source
+         audioInstanceRef.current = null;
+       }
+      // Use stopAudio from useAudio hook if available/needed
+      stopAudio();
+      return;
+    }
+
+    // Reset state when narrativeToLoad changes
     setNarrativeData(null);
     setIsPausedByUser(false); // Reset pause state
     setImageVisible(false); // Reset image visibility
@@ -87,16 +120,6 @@ const NarrativeReader = ({
     setAudioDuration(0); // Reset audio duration
     setCurrentImageUrl(null); // Reset current image
 
-    if (!narrativeId) {
-      // If there's an active audio instance from a previous narrative, stop it
-      if (audioInstanceRef.current && typeof audioInstanceRef.current.pause === 'function') {
-         audioInstanceRef.current.pause();
-         audioInstanceRef.current.src = ''; // Detach source
-         audioInstanceRef.current = null;
-      }
-      // Consider calling a stop function from useAudio if available/needed
-      return;
-    }
 
     const fetchNarrative = async () => {
       setIsLoading(true);
@@ -107,13 +130,29 @@ const NarrativeReader = ({
 
 
       try {
-        // Assuming narratives are in /public/narratives/
-        const response = await fetch(`/narratives/${narrativeId}.json`);
+        // Assuming narratives are in /public/narratives/ and named after narrativeToLoad
+        const response = await fetch(`/narratives/${narrativeToLoad}.json`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
         setNarrativeData(data);
+
+        // Check if the loaded narrative data corresponds to a tuning challenge
+        if (data.requiresTuning) {
+            const challengeConfig = {
+                id: data.tuningChallengeId, // e.g., 'LunarSignal1'
+                // Pass specific parameters if needed, or let SignalTuningInterface fetch based on ID
+                baseNoise: data.tuningBaseNoise,
+                interpretations: data.tuningInterpretations,
+             };
+            setActiveTuningChallenge(challengeConfig);
+            console.log("Setting active tuning challenge:", challengeConfig);
+        } else {
+            // If not a tuning challenge, ensure activeTuningChallenge is null
+            setActiveTuningChallenge(null);
+        }
+
 
         // Set initial image from the first page if available
         if (data.pages && data.pages.length > 0 && data.pages[0].imageUrl) {
@@ -128,19 +167,19 @@ const NarrativeReader = ({
            console.log('[NarrativeReader] Narrative fetched, loading audio:', data.audio);
            playAudioFile(data.audio);
         } else {
-          console.warn(`Narrative ${narrativeId} is missing the 'audio' property in its JSON data.`);
+          console.warn(`Narrative ${narrativeToLoad} is missing the 'audio' property in its JSON data.`);
         }
 
       } catch (e) {
         console.error("[NarrativeReader] CATCH BLOCK: Failed to fetch narrative:", e); // Add specific log
-        setError(`Failed to load narrative: ${narrativeId}. Error: ${e.message}`);
+        setError(`Failed to load narrative: ${narrativeToLoad}. Error: ${e.message}`);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchNarrative();
-  }, [narrativeId, playAudioFile]);
+  }, [narrativeToLoad, playAudioFile, stopAudio, setActiveTuningChallenge]); // Depend on narrativeToLoad, playAudioFile, stopAudio, and setActiveTuningChallenge
 
   // Effect to calculate total scrollable height after narrative data is loaded and rendered
   useLayoutEffect(() => { // Changed to useLayoutEffect
@@ -156,7 +195,6 @@ const NarrativeReader = ({
 
       // Use a small timeout to ensure DOM is updated after data render
       const timer = setTimeout(calculateHeight, 50);
-
       return () => clearTimeout(timer);
     }
   }, [narrativeData]); // Recalculate when narrative data changes
@@ -208,31 +246,31 @@ const NarrativeReader = ({
             console.log('[NarrativeReader] Audio duration available immediately:', initialDuration);
          }
       } else {
-         // If not immediately available, listen for 'loadedmetadata' or 'load'
-         console.warn('[NarrativeReader] Audio duration not immediately available. Adding listener.');
-         // Use 'loadedmetadata' for HTMLAudioElement, 'load' for Howler.js
-         // Determine the correct event name based on the instance type
-         const eventName = typeof audioInstance.duration === 'function' ? 'load' : 'loadedmetadata';
-         // Ensure the instance has the addEventListener method before using it
-         if (typeof audioInstance.addEventListener === 'function') {
-            audioInstance.addEventListener(eventName, handleLoadedMetadata);
-         } else if (typeof audioInstance.on === 'function') {
-            // Handle cases where it might use .on/.off (like Howler v2)
-            audioInstance.on(eventName, handleLoadedMetadata);
-         } else {
-            console.warn('[NarrativeReader] Audio instance does not support standard event listeners (addEventListener/on). Cannot track loadedmetadata.');
-         }
+          // If not immediately available, listen for 'loadedmetadata' or 'load'
+          console.warn('[NarrativeReader] Audio duration not immediately available. Adding listener.');
+          // Use 'loadedmetadata' for HTMLAudioElement, 'load' for Howler.js
+          // Determine the correct event name based on the instance type
+          const eventName = typeof audioInstance.duration === 'function' ? 'load' : 'loadedmetadata';
+          // Ensure the instance has the addEventListener method before using it
+          if (typeof audioInstance.addEventListener === 'function') {
+             audioInstance.addEventListener(eventName, handleLoadedMetadata);
+          } else if (typeof audioInstance.on === 'function') {
+             // Handle cases where it might use .on/.off (like Howler v2)
+             audioInstance.on(eventName, handleLoadedMetadata);
+          } else {
+             console.warn('[NarrativeReader] Audio instance does not support standard event listeners (addEventListener/on). Cannot track loadedmetadata.');
+          }
 
 
-         // Cleanup listener
-         return () => {
-           isMounted = false; // Set flag to false on cleanup
-           if (typeof audioInstance.removeEventListener === 'function') {
-              audioInstance.removeEventListener(eventName, handleLoadedMetadata);
-           } else if (typeof audioInstance.off === 'function') {
-              audioInstance.off(eventName, handleAudioEnd); // Note: This should be handleLoadedMetadata, not handleAudioEnd
-           }
-         };
+          // Cleanup listener
+          return () => {
+            isMounted = false; // Set flag to false on cleanup
+            if (typeof audioInstance.removeEventListener === 'function') {
+               audioInstance.removeEventListener(eventName, handleLoadedMetadata);
+            } else if (typeof audioInstance.off === 'function') {
+               audioInstance.off(eventName, handleAudioEnd); // Note: This should be handleLoadedMetadata, not handleAudioEnd
+            }
+          };
       }
 
       // Cleanup function for the case where duration was immediately available
@@ -298,22 +336,32 @@ const NarrativeReader = ({
     }
   }, [narrativeData]); // Depend only on narrativeData to trigger after load
 
-  // Reset the trigger flag if the narrative changes
+  // Reset the trigger flag if the narrative changes (based on narrativeToLoad)
   useEffect(() => {
     initialPlayTriggeredRef.current = false;
-  }, [narrativeId]);
+  }, [narrativeToLoad]); // Depend on narrativeToLoad
 
   // Effect for handling narrative completion
   useEffect(() => {
     const audioInstance = getAudioInstance(); // Use getAudioInstance to get the current instance
-    // Check if onComplete is actually a function before proceeding
-    if (!audioInstance || !narrativeData || typeof onComplete !== 'function') {
-      return; // Exit if no audio, data, or valid callback
+    // Check if audioInstance and narrativeData are available
+    if (!audioInstance || !narrativeData) {
+      return; // Exit if no audio or data
     }
 
     const handleAudioEnd = () => {
-      console.log('[NarrativeReader] Audio ended. Calling onComplete.');
-      onComplete();
+      console.log('[NarrativeReader] Audio ended. Advancing narrative.');
+      // Get the latest state using get() from Zustand
+      const state = useGameStore.getState();
+      const currentGameState = state.gameState;
+
+      // TODO: Determine the next node ID based on narrative logic/choices
+      // For now, we'll use a placeholder or logic based on the *current* node if needed
+      // const nextNodeId = determineNextNode(currentGameState.currentNodeId); // Example logic
+      const nextNodeId = 'next_narrative_node'; // Placeholder - replace with actual logic
+
+      // Update currentNodeId in Zustand
+      updateGameState({ currentNodeId: nextNodeId });
     };
 
     // Howler uses 'end', HTMLAudioElement uses 'ended'
@@ -339,8 +387,8 @@ const NarrativeReader = ({
         }
       }
     };
-    // Re-run if audio instance changes, narrative changes, or callback changes
-  }, [narrativeData, onComplete, getAudioInstance]);
+    // Re-run if audio instance changes, narrative changes, or updateGameState changes
+  }, [narrativeData, getAudioInstance, updateGameState]);
 
 
   // Handler for the Play/Pause button

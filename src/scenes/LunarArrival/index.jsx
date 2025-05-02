@@ -41,6 +41,8 @@ const LunarArrival = ({ dataPerceptionMode }) => {
   const handleTransitionComplete = () => {
     console.log('Transition Complete - Triggering Flashback Narrative');
     setIntroPhase('flashbackNarrative');
+    // Set the currentNodeId to trigger the NarrativeReader
+    updateGameState({ currentNodeId: flashbackNarrativeId });
   };
 
   const handleNarrativeComplete = () => {
@@ -111,7 +113,7 @@ const LunarArrival = ({ dataPerceptionMode }) => {
       {gameState.introPhase === 'flashbackNarrative' && (
         <div style={{ display: dataPerceptionMode ? 'none' : 'block' }}>
           <NarrativeReader
-            narrativeId={flashbackNarrativeId} // Use placeholder ID
+            narrativeToLoad={flashbackNarrativeId} // Pass the narrative ID as a prop
             backgroundImageUrl={labBackgroundImage} // Use placeholder image
             onComplete={handleNarrativeComplete}
           />

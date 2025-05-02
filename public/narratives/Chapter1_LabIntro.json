@@ -1,0 +1,42 @@
+{
+  "id": "_1745348918_251680",
+  "audio": "/audio/narration/flashback.mp3",
+  "pages": [
+    {
+      "text": "Dr. Thorne sat still in the neural merger chamber, his mind filled with the haunting memories of Sarah and the calamity that unfolded on Mars Colony. The ache of loss lingered in his soul, propelling him toward the mysterious alien signals that beckoned him with their enigmatic allure.",
+      "timestamp": 0,
+      "imageUrl": "/front_pic/pic1.jpg"
+    },
+    {
+      "text": "The chamber hummed with an electric energy, a symphony of anticipation for the monumental fusion of human and artificial intelligence. Alara, the sophisticated AI system crafted for interstellar communications, stood poised, her digital voice a soothing presence amidst the charged atmosphere.",
+      "timestamp": 28.3,
+      "imageUrl": "/front_pic/pic2.jpg"
+    },
+    {
+      "text": "Dr. Chen, the brilliant mind leading the project, watched intently as the neural merger commenced. The intricate patterns of the alien signals had confounded their analysis for too long, teasing them with their complexity and secrets. The weight of urgency pressed down on their collective shoulders, urging them forward into the unknown.",
+      "timestamp": 29.95,
+      "imageUrl": "/front_pic/pic3.jpg"
+    },
+    {
+      "text": "As the merging of neural pathways began, Dr. Thorne felt a surge of excitement mingled with a hint of trepidation. The boundaries between human consciousness and AI blurred, opening gateways to uncharted territories of the mind.",
+      "timestamp": 45.85,
+      "imageUrl": "/front_pic/pic4.jpg"
+    },
+    {
+      "text": "In that moment of convergence, Dr. Thorne sensed a shift in his perception, a fusion of minds beyond his wildest imagination. The alien signals murmured in the background, tantalizingly cryptic, drawing him deeper into their enigmatic web.",
+      "timestamp": 57.25,
+      "imageUrl": "/front_pic/pic5.jpg"
+    },
+    {
+      "text": "Through the neural connection with Alara, Dr. Thorne delved into the depths of the alien transmissions, his consciousness expanding beyond the confines of flesh. Visions of distant galaxies and celestial marvels cascaded through his being, each signal shard a fragment of a cosmic enigma waiting to be deciphered.",
+      "timestamp": 69.2,
+      "imageUrl": "/front_pic/pic6.jpg"
+    },
+    {
+      "text": "Within the intertwined consciousness of man and machine, a profound understanding bloomed, transcending the boundaries of self. Together, they charted a course through the vast expanse of signals, questing for the truth veiled within the mysterious transmissions from the realms beyond Proxima b.",
+      "timestamp": 84.85,
+      "imageUrl": "/front_pic/pic7.jpg"
+    }
+  ],
+  "generation_method": "rag"
+}

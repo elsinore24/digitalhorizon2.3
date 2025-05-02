@@ -1,19 +1,39 @@
 {
   "mcpServers": {
-    "github.com/alexander-zuev/supabase-mcp-server": {
-      "command": "C:\\Users\\Daniel\\.local\\bin\\supabase-mcp-server.exe",
-      "args": [],
-      "env": {
-        "SUPABASE_URL": "https://zhhnrhkvrakfyaslfhpf.supabase.co",
-        "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpoaG5yaGt2cmFrZnlhc2xmaHBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE5Mjc3MDYsImV4cCI6MjA1NzUwMzcwNn0.B6JKCZ9SYDBM1lefeU4XzLmeZdFd2NEwGr8rGOskLWg",
-        "SUPABASE_SERVICE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpoaG5yaGt2cmFrZnlhc2xmaHBmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MTkyNzcwNiwiZXhwIjoyMDU3NTAzNzA2fQ.xCYCWuiYlpUgfISmGOpRLWytjdA9RhJwxTcsq6Mx--Y",
-        "SUPABASE_PROJECT_REF": "zhhnrhkvrakfyaslfhpf",
-        "SUPABASE_REGION": "us-west-1"
-      },
+    "UnityMCP": {
+      "autoApprove": [],
+      "disabled": true,
+      "timeout": 60,
+      "command": "C:\\Users\\Daniel\\AppData\\Roaming\\Python\\Python313\\Scripts\\uv.exe",
+      "args": [
+        "--directory",
+        "C:\\Users\\Daniel\\AppData\\Local\\Programs\\UnityMCP\\UnityMcpServer\\src",
+        "run",
+        "server.py"
+      ],
+      "transportType": "stdio"
+    },
+    "supabase": {
+      "autoApprove": [],
       "disabled": false,
-      "autoApprove": []
+      "timeout": 60,
+      
+      "command": "C:\\WINDOWS\\system32\\cmd.exe",
+      "args": [
+        "/c", 
+        "C:\\Program Files\\nodejs\\npx.cmd", 
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "sbp_6cf29db25bc447bd40ae60e945a0a28097064019"
+      ],
+      "env": {},
+      "transportType": "stdio"
     },
     "github.com/modelcontextprotocol/servers/tree/main/src/brave-search": {
+      "autoApprove": [],
+      "disabled": false,
+      "timeout": 60,
       "command": "C:\\WINDOWS\\system32\\cmd.exe",
       "args": [
         "/c",
@@ -22,17 +42,73 @@
       "env": {
         "BRAVE_API_KEY": "BSAbAqrgQ12dIhATQrGefd9GcW0pDGR"
       },
-      "disabled": false,
-      "autoApprove": []
+      "transportType": "stdio"
     },
     "github.com/zcaceres/fetch-mcp": {
+      "autoApprove": [],
+      "disabled": false,
+      "timeout": 60,
       "command": "node",
       "args": [
         "C:\\Users\\Daniel\\Documents\\Cline\\MCP\\fetch-mcp\\dist\\index.js"
       ],
       "env": {},
+      "transportType": "stdio"
+    },
+    "github.com/elevenlabs/elevenlabs-mcp": {
+      "autoApprove": [],
       "disabled": false,
-      "autoApprove": []
+      "timeout": 60,
+      "command": "C:\\Users\\Daniel\\AppData\\Roaming\\Python\\Python313\\Scripts\\uvx.exe",
+      "args": [
+        "elevenlabs-mcp"
+      ],
+      "env": {
+        "ELEVENLABS_API_KEY": "sk_a4f3aa5e355915ce20dcf45eab6bd61eaa547a9a5c4df065"
+      },
+      "transportType": "stdio"
+    },
+    "github.com/upstash/context7-mcp": {
+      "autoApprove": [],
+      "disabled": false,
+      "timeout": 60,
+      "command": "node",
+      "args": [
+        "C:\\Users\\Daniel\\Documents\\Cline\\MCP\\github.com\\upstash\\context7-mcp\\dist\\index.js"
+      ],
+      "env": {},
+      "transportType": "stdio"
+    },
+    "github.com/codingthefuturewithai/screenshot_mcp_server": {
+      "autoApprove": [],
+      "disabled": false,
+      "timeout": 60,
+      "command": "screenshot_mcp_server-server",
+      "args": [],
+      "transportType": "stdio"
+    },
+    "UnityMCPIntegration": {
+      "autoApprove": [
+        "get_current_scene_info",
+        "get_game_objects_info",
+        "get_logs",
+        "verify_connection",
+        "get_editor_state",
+        "read_file",
+        "read_multiple_files",
+        "list_directory",
+        "directory_tree",
+        "search_files",
+        "get_file_info",
+        "find_assets_by_type"
+      ],
+      "disabled": false,
+      "timeout": 60,
+      "command": "node",
+      "args": [
+        "C:\\Users\\Daniel\\Documents\\Cline\\MCP\\UnityMCPIntegration\\mcpServer\\build\\index.js"
+      ],
+      "transportType": "stdio"
     }
   }
 }

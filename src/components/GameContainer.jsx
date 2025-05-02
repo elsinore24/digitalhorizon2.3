@@ -6,17 +6,28 @@ import DataPerceptionOverlay from './DataPerceptionOverlay';
 import TopStatusBar from './TopStatusBar'; // Import new component
 import NarrationIndicator from './NarrationIndicator';
 import MuteButton from './MuteButton';
-import useGameState from '../hooks/useGameState';
+// import useGameState from '../hooks/useGameState'; // Remove old import
 import useAudio from '../hooks/useAudio'; // Import useAudio
 import useAuth from '../hooks/useAuth';
+import { useGameStore } from '../store/useGameStore'; // Import useGameStore
 import useDatabase from '../hooks/useDatabase';
 import styles from './GameContainer.module.scss'
 
 export default function GameContainer() {
-  const { gameState, toggleDataPerception } = useGameState();
+  // const { gameState, toggleDataPerception } = useGameState(); // Remove old hook usage
   const { storeAudioStateBeforeToggle, restoreAudioStateAfterToggle } = useAudio(); // Get audio state functions
   const { user } = useAuth();
   const { loadGame } = useDatabase();
+
+  // Get currentView and setView from Zustand store
+  const { currentView, setView } = useGameStore(state => ({
+    currentView: state.currentView,
+    setView: state.setView,
+  }));
+
+  // Read gameState from Zustand store
+  const gameState = useGameStore(state => state.gameState);
+
 
   useEffect(() => {
     if (user) {
@@ -26,20 +37,24 @@ export default function GameContainer() {
 
   // Create a wrapped toggle function
   const handleToggleDataPerception = useCallback(() => {
-    if (!gameState.dataPerceptionActive) {
-      // About to turn ON data perception, store audio state
+    // Determine the next view
+    const nextView = currentView === 'narrative' ? 'perception' : 'narrative';
+
+    if (nextView === 'perception') {
+      // About to switch to perception, store audio state
       storeAudioStateBeforeToggle();
     } else {
-      // About to turn OFF data perception
+      // About to switch back to narrative
       // Use setTimeout to ensure component has updated before restoring audio
       setTimeout(() => {
         restoreAudioStateAfterToggle();
       }, 100); // Small delay to ensure components have updated
     }
-    
-    // Call the original toggle function
-    toggleDataPerception();
-  }, [gameState.dataPerceptionActive, toggleDataPerception, storeAudioStateBeforeToggle, restoreAudioStateAfterToggle]);
+
+    // Call the setView action from Zustand
+    setView(nextView);
+
+  }, [currentView, setView, storeAudioStateBeforeToggle, restoreAudioStateAfterToggle]); // Depend on currentView and setView
 
   useEffect(() => {
     const handleKeyPress = (e) => {
@@ -67,13 +82,6 @@ export default function GameContainer() {
       <DataPerceptionOverlay active={gameState.dataPerceptionActive} />
       {/* Removed StabilityMeter rendering */}
       {/* <NarrationIndicator /> */} {/* Temporarily hide */}
-      <button
-        className={styles.perceptionToggle}
-        onClick={handleToggleDataPerception} // Use the wrapped function
-      >
-        Toggle Data Perception [Tab]
-      </button>
-      <MuteButton />
     </div>
   )
 }
