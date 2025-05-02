@@ -1,0 +1,59 @@
+/* src/components/GameUIIndicators/PhysicalVitalityIndicator.module.scss */
+@use "sass:math"; // Import Sass math module if needed for calculations
+
+.vitalityIndicator {
+  /* Specific overrides or additions for Physical Vitality */
+}
+
+.segmentedBar {
+  display: flex;
+  width: 100%;
+  height: 7px; /* Adjusted height */
+  background-color: rgba(0, 0, 0, 0.4); /* Darker background for segments */
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 150, 150, 0.3);
+  padding: 1px; /* Small padding to see segment gaps */
+  gap: 1px; /* Gap between segments */
+}
+
+.segment {
+  flex-grow: 1; /* Each segment takes equal space */
+  height: 100%;
+  border-radius: 1px; /* Slightly rounded segments */
+  transition: background-color 0.5s ease-out, opacity 0.5s ease-out; /* Smooth transition */
+  position: relative; /* For potential pseudo-elements */
+}
+
+.empty {
+  background-color: rgba(100, 150, 150, 0.15); /* Dimmed color for empty segments */
+  opacity: 0.6;
+}
+
+.filled {
+  /* Apply the blue-to-teal gradient */
+  background-image: linear-gradient(to right, var(--vitality-start-color), var(--vitality-end-color));
+  background-size: 200% 100%; /* Make gradient span wider than segment */
+  background-position: calc( (var(--segment-index, 0) / var(--filled-segments, 1)) * -100% ) 0; /* Shift gradient based on index */
+  opacity: 1;
+  animation: pulseFilledVitality 2.2s infinite ease-in-out; /* Slightly different timing */
+  box-shadow: inset 0 0 3px rgba(255, 255, 255, 0.2); /* Inner highlight */
+
+  /* Add a subtle glow effect to filled segments */
+   &::after {
+     content: '';
+     position: absolute;
+     top: -1px; left: -1px; right: -1px; bottom: -1px;
+     background: linear-gradient(to right, var(--vitality-start-color), var(--vitality-end-color));
+     filter: blur(2px);
+     opacity: 0.5;
+     z-index: -1;
+     border-radius: 2px;
+   }
+}
+
+@keyframes pulseFilledVitality {
+  0% { opacity: 0.85; filter: brightness(0.9); }
+  50% { opacity: 1; filter: brightness(1.1); }
+  100% { opacity: 0.85; filter: brightness(0.9); }
+}

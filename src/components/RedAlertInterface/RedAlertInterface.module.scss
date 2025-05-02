@@ -1,0 +1,201 @@
+.redAlertContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #300;
+  color: #f00;
+  font-family: 'Courier New', monospace;
+  padding: 20px;
+  animation: pulse 1.5s infinite;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center; /* Center content horizontally */
+  z-index: 1000; /* Ensure it's above Scene3D */
+  box-sizing: border-box; /* Include padding in dimensions */
+}
+
+.headerBox {
+  border: 2px solid #f00;
+  padding: 15px;
+  margin-bottom: 20px;
+  width: 80%; /* Limit width */
+  max-width: 600px; /* Max width */
+}
+
+.headerTitle {
+  color: #f00;
+  font-size: 28px;
+  margin: 0;
+  animation: flicker 0.3s infinite;
+}
+
+.statusSection {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 30px;
+  width: 80%; /* Limit width */
+  max-width: 600px; /* Max width */
+}
+
+.statusBlock {
+  text-align: left;
+  width: 48%;
+}
+
+.statusLabel {
+  margin-bottom: 5px;
+}
+
+.statusValue {
+  animation: flash 0.5s infinite;
+  font-weight: bold;
+  font-size: 24px;
+}
+
+.statusBarOuter {
+  width: 100%;
+  height: 10px;
+  background-color: #500;
+  position: relative;
+  margin-top: 5px;
+}
+
+.statusBarInner {
+  position: absolute;
+  height: 10px;
+  background-color: #f00;
+  animation: flicker 0.5s infinite;
+}
+
+.dialogueBlock {
+  margin: 15px 0;
+  width: 80%; /* Limit width */
+  max-width: 600px; /* Max width */
+}
+
+.dialogueAlara {
+  text-align: left;
+  border-left: 3px solid #f00;
+  padding-left: 10px;
+  font-style: italic;
+  color: #ff9999;
+}
+
+.dialogueThorne {
+  text-align: right;
+  border-right: 3px solid #800; /* Darker red for Thorne's border */
+  padding-right: 10px;
+  font-style: italic;
+  color: #cc8888;
+  animation: fade 2s infinite;
+}
+
+.warningBlock {
+  margin: 15px 0;
+  animation: flash 1s infinite;
+  width: 80%; /* Limit width */
+  max-width: 600px; /* Max width */
+  text-align: center; /* Center warning text */
+}
+
+.actionButtonContainer {
+  margin-top: 30px;
+}
+
+.actionButton {
+  background-color: #cc0022; // Darker neon red
+  color: #ffffff; // White text
+  border: 3px solid #ffffff; // White border, thicker
+  padding: 15px 30px; // Increased padding
+  font-size: 20px; // Increased font size
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-weight: bold; // Added for emphasis
+  text-transform: uppercase; // Added for emphasis
+  letter-spacing: 1px; // Added for better readability
+
+  // Multiple animations
+  animation:
+    enhancedPulse 1.2s infinite,
+    shake 2s infinite,
+    glow 1.5s infinite;
+
+  // Glow effect
+  box-shadow:
+    0 0 10px #ffffff,
+    0 0 20px rgba(255, 255, 255, 0.7);
+
+  // Revert size to original
+  transform: scale(1);
+
+  // Better positioning
+  margin: 20px auto;
+
+  &:hover {
+    background-color: #dd1133; // Darker hover red
+    color: #ffffff; // Keep white text
+    box-shadow:
+      0 0 15px #ffffff,
+      0 0 30px rgba(255, 255, 255, 0.8);
+  }
+}
+
+/* Add this block for mobile adjustments */
+@media (max-width: 768px) {
+  .redAlertContainer {
+    justify-content: flex-start; /* Align content to the top on mobile */
+    padding-top: 5px; /* Keep small top padding */
+  }
+}
+
+/* Keyframes */
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+@keyframes flicker {
+  0% { opacity: 1; }
+  25% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+  75% { opacity: 0.2; }
+  100% { opacity: 1; }
+}
+
+@keyframes flash {
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+@keyframes fade {
+  0% { opacity: 0.9; }
+  50% { opacity: 0.4; }
+  100% { opacity: 0.9; }
+}
+
+// Enhanced pulse animation
+@keyframes enhancedPulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); } // Smaller pulse scale
+  100% { opacity: 1; transform: scale(1); }
+}
+
+// Shake animation
+@keyframes shake {
+  0%, 100% { transform: translateX(0); } // Remove scale from shake
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+// Glow animation
+@keyframes glow {
+  0% { box-shadow: 0 0 10px #ffffff, 0 0 20px rgba(255, 255, 255, 0.7); }
+  50% { box-shadow: 0 0 15px #ffffff, 0 0 30px rgba(255, 255, 255, 0.9); }
+  100% { box-shadow: 0 0 10px #ffffff, 0 0 20px rgba(255, 255, 255, 0.7); }
+}

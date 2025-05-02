@@ -13,7 +13,10 @@ export default function useAudio() {
     pauseAudio: context?.pauseAudio,
     resumeAudio: context?.resumeAudio,
     getAnalyzerData: context?.getAnalyzerData,
-    playAudioFile: context?.playAudioFile
+    playAudioFile: context?.playAudioFile,
+    storeAudioStateBeforeToggle: context?.storeAudioStateBeforeToggle,
+    restoreAudioStateAfterToggle: context?.restoreAudioStateAfterToggle,
+    stopNarration: context?.stopNarration // Add stopNarration from context
   });
   
   // Update the refs when the context functions change
@@ -25,7 +28,9 @@ export default function useAudio() {
       pauseAudio: context?.pauseAudio,
       resumeAudio: context?.resumeAudio,
       getAnalyzerData: context?.getAnalyzerData,
-      playAudioFile: context?.playAudioFile
+      playAudioFile: context?.playAudioFile,
+      storeAudioStateBeforeToggle: context?.storeAudioStateBeforeToggle,
+      restoreAudioStateAfterToggle: context?.restoreAudioStateAfterToggle
     };
   }, [
     context?.playNarration,
@@ -34,7 +39,10 @@ export default function useAudio() {
     context?.pauseAudio,
     context?.resumeAudio,
     context?.getAnalyzerData,
-    context?.playAudioFile
+    context?.playAudioFile,
+    context?.storeAudioStateBeforeToggle,
+    context?.restoreAudioStateAfterToggle,
+    context?.stopNarration // Add stopNarration to dependencies
   ]);
   
   // Wrap the context methods in useCallback with empty dependency arrays
@@ -83,6 +91,25 @@ export default function useAudio() {
     }
   }, []);
   
+  const storeAudioStateBeforeToggle = useCallback(() => {
+    if (contextFunctionsRef.current.storeAudioStateBeforeToggle) {
+      contextFunctionsRef.current.storeAudioStateBeforeToggle();
+    }
+  }, []);
+  
+  const restoreAudioStateAfterToggle = useCallback(() => {
+    if (contextFunctionsRef.current.restoreAudioStateAfterToggle) {
+      contextFunctionsRef.current.restoreAudioStateAfterToggle();
+    }
+  }, []);
+
+  // Add stopAudio function (wrapping stopNarration from context)
+  const stopAudio = useCallback(() => {
+    if (contextFunctionsRef.current.stopNarration) {
+      contextFunctionsRef.current.stopNarration();
+    }
+  }, []);
+
   // Return a consistent object shape every time
   return {
     isPlaying: context ? context.isPlaying : false,
@@ -96,6 +123,9 @@ export default function useAudio() {
     toggleMute,
     playAudioFile,
     pauseAudio,
-    resumeAudio
+    resumeAudio,
+    storeAudioStateBeforeToggle,
+    restoreAudioStateAfterToggle,
+    stopAudio // Include stopAudio in the returned object
   }
 }

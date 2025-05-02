@@ -1,0 +1,43 @@
+.choiceContainer {
+  position: fixed;
+  bottom: 5%; /* Position near the bottom */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  max-width: 700px;
+  background-color: rgba(10, 30, 50, 0.85); /* Slightly darker, more opaque blue */
+  border: 1px solid #4dd0e1; /* Cyan border */
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-around; /* Space out buttons */
+  align-items: center;
+  z-index: 1050; /* Above Lab Scene, potentially above NarrativeReader if needed */
+  box-shadow: 0 0 15px rgba(77, 208, 225, 0.3); /* Subtle cyan glow */
+  font-family: 'Orbitron', sans-serif; /* Match lab font */
+  pointer-events: auto; /* Enable interaction */
+}
+
+.choiceButton {
+  background-color: transparent;
+  border: 2px solid #80deea; /* Lighter cyan border */
+  color: #e0f2f7; /* Light cyan text */
+  padding: 12px 25px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+  border-radius: 5px;
+  text-align: center;
+  flex-basis: 45%; /* Give buttons roughly equal width */
+  font-family: inherit; /* Use container font */
+
+  &:hover {
+    background-color: rgba(77, 208, 225, 0.2); /* Light cyan background on hover */
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(77, 208, 225, 0.5);
+  }
+
+  &:active {
+    background-color: rgba(77, 208, 225, 0.4);
+  }
+}

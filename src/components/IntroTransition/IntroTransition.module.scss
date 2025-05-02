@@ -1,0 +1,59 @@
+.transitionContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  color: #f00;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  animation: backgroundStatic 0.1s infinite steps(2);
+}
+
+// Glitch text effect
+.glitchText {
+  animation: glitch 0.5s infinite alternate;
+  text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .transitionContainer {
+    justify-content: flex-start;
+    padding-top: 15vh;
+  }
+  
+  .glitchText {
+    font-size: 2em !important; /* Override inline styles for very small screens */
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 375px) {
+  .transitionContainer {
+    padding-top: 10vh;
+  }
+  
+  .glitchText {
+    font-size: 1.8em !important;
+  }
+}
+
+/* Simple static background effect */
+@keyframes backgroundStatic {
+  0% { background-color: #050505; }
+  50% { background-color: #000000; }
+  100% { background-color: #0a0a0a; }
+}
+
+/* Glitch effect */
+@keyframes glitch {
+  0% { transform: translate(0); }
+  25% { transform: translate(-2px, 2px); color: #0ff; }
+  50% { transform: translate(2px, -2px); color: #ff0; }
+  75% { transform: translate(-1px, 1px); color: #f0f; }
+  100% { transform: translate(0); }
+}

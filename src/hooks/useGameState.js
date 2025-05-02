@@ -2,13 +2,15 @@ import { create } from 'zustand'
 
 const initialState = {
   currentScene: 'LunarArrival',
+  introPhase: 'initial', // <<< ADDED introPhase HERE
   dataPerceptionActive: false,
   player: {
-    stabilityMeter: 100
+    stabilityMeter: 100,
+    flashbackChoice: null // <<< ADDED flashbackChoice HERE
   },
   discoveredEchoes: [],
   scenesVisited: []
-}
+};
 
 const useGameState = create((set) => ({
   gameState: initialState,
@@ -42,7 +44,18 @@ const useGameState = create((set) => ({
         stabilityMeter: Math.max(0, state.gameState.player.stabilityMeter - 2)
       }
     }
-  }))
+  })),
+
+  // Add setIntroPhase action to Zustand store
+  setIntroPhase: (phase) => set((state) => {
+    console.log(`[Zustand] Setting introPhase to: ${phase}`);
+    return {
+      gameState: {
+        ...state.gameState,
+        introPhase: phase
+      }
+    };
+  }),
 }))
 
 export default useGameState

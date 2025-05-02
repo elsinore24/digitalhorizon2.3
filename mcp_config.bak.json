@@ -1,0 +1,14 @@
+{
+  "supabase_url": "postgresql://postgres:D8h9uhFWf6I8I2o6@db.zhhnrhkvrakfyaslfhpf.supabase.co:5432/postgres",
+  "mcpServers": {
+    "supabase": {
+      "command": "cmd /c npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "sbp_6cf29db25bc447bd40ae60e945a0a28097064019"
+      ]
+    }
+  }
+}

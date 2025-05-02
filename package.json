@@ -9,11 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.1",
+    "@supabase/supabase-js": "^2.49.4",
     "framer-motion": "^10.16.0",
     "gsap": "^3.12.7",
     "howler": "^2.2.3",
+    "html2canvas": "^1.4.1",
     "node-fetch": "^3.3.2",
+    "prop-types": "^15.8.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.15.0",

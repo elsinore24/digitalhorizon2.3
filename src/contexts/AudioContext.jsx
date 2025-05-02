@@ -27,6 +27,10 @@ export function AudioProvider({ children }) {
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [pendingPlayback, setPendingPlayback] = useState(null); // State for deferred playback { url, dialogueId, dialogue, isTone }
   
+  // State for tracking audio state before data perception toggle
+  const [wasPlayingBeforeToggle, setWasPlayingBeforeToggle] = useState(false);
+  const [audioPositionBeforeToggle, setAudioPositionBeforeToggle] = useState(0);
+  
   // Check if we're on iOS and get version
   const [iOSVersion, setIOSVersion] = useState(0);
   const [isNewerIOS, setIsNewerIOS] = useState(false);
@@ -383,10 +387,11 @@ export function AudioProvider({ children }) {
     if (!audioElementRef.current) return false;
     
     try {
+      console.log(`[playAudioWithElementRef] Attempting to set src: ${url}`); // Added logging
       audioElementRef.current.src = url;
       audioRef.current = audioElementRef.current; // Ensure getAudioInstance returns the correct element
       audioElementRef.current.onloadeddata = () => {
-        console.log('Audio loaded:', dialogueId);
+        console.log('[playAudioWithElementRef] Audio loaded:', dialogueId); // Modified logging
         setCurrentDialogue(dialogue);
         
         // Connect analyzer to the audio element
@@ -419,7 +424,7 @@ export function AudioProvider({ children }) {
       };
       
       audioElementRef.current.onerror = (err) => {
-        console.error('Audio error:', err);
+        console.error('[playAudioWithElementRef] Audio error:', err); // Modified logging
         return false;
       };
       
@@ -444,6 +449,7 @@ export function AudioProvider({ children }) {
       
       // Create a hidden audio element specifically for iOS playback
       const iosAudioElement = document.createElement('audio');
+      console.log(`[playAudioWithToneRef] Attempting to set src: ${url}`); // Added logging
       iosAudioElement.src = url;
       iosAudioElement.crossOrigin = 'anonymous';
       iosAudioElement.preload = 'auto';
@@ -591,8 +597,9 @@ export function AudioProvider({ children }) {
 
   // Create a stable reference for the context state change handler
   const handleContextStateChangeRef = useRef((context, pendingPlayback) => {
+    console.log(`[handleContextStateChangeRef] Context state changed to: ${context.state}, pendingPlayback: ${pendingPlayback ? 'Yes' : 'No'}`); // Added logging
     if (context.state === 'running' && pendingPlayback) {
-      console.log('Audio context is running, attempting pending playback:', pendingPlayback.dialogueId || pendingPlayback.url);
+      console.log('[handleContextStateChangeRef] Audio context is running, attempting pending playback:', pendingPlayback.dialogueId || pendingPlayback.url); // Modified logging
       // Call the appropriate playback function based on the stored flag
       if (pendingPlayback.isTone) {
         playAudioWithToneRef.current(pendingPlayback.url, pendingPlayback.dialogueId, pendingPlayback.dialogue);
@@ -721,7 +728,9 @@ export function AudioProvider({ children }) {
 
   // Create a stable reference for playAudioFile
   const playAudioFileRef = useRef(async (filePath) => {
+    console.log(`[playAudioFileRef] Received filePath: ${filePath}`); // Added logging
     if (!filePath) {
+      console.warn('[playAudioFileRef] No filePath provided.'); // Added logging
       return;
     }
 
@@ -730,8 +739,11 @@ export function AudioProvider({ children }) {
     // Check if filePath is a data URI
     if (filePath.startsWith('data:audio/')) {
       url = filePath; // Use the data URI directly
+      console.log(`[playAudioFileRef] Detected data URI, url: ${url.substring(0, 50)}...`); // Added logging
     } else {
-      url = `/${filePath}`; // Construct URL assuming filePath is relative to public root
+      // Construct URL assuming filePath is relative to public root, avoid double slash
+      url = filePath.startsWith('/') ? filePath : `/${filePath}`;
+      console.log(`[playAudioFileRef] Constructed URL: ${url}`); // Added logging
     }
 
     // Placeholder info - might not be needed if playback functions don't rely on it
@@ -763,6 +775,7 @@ export function AudioProvider({ children }) {
 
       // Determine playback method based on iOS or fallback logic
       const isIOSDevice = isIOS; // Capture current value to avoid closure issues
+      console.log(`[playAudioFileRef] isIOSDevice: ${isIOSDevice}`); // Added logging
       if (isIOSDevice) {
         // playAudioWithTone creates its own element and connects analyzer
         playAudioWithToneRef.current(url, filePath, tempDialogueInfo); // Use filePath as ID
@@ -867,8 +880,10 @@ export function AudioProvider({ children }) {
     });
   }, []); // Dependencies: isMuted state is implicitly handled by setIsMuted setter. Refs don't need to be deps.
   // Function to pause the currently playing audio
-  const pauseAudio = useCallback(() => {
-    const currentAudio = audioRef.current; // Get the potentially active audio element
+  // Function to pause the currently playing audio (useCallback removed)
+  const pauseAudio = () => {
+    // Select the correct audio element based on platform
+    const currentAudio = isIOS ? audioRef.current : audioElementRef.current;
     if (currentAudio && typeof currentAudio.pause === 'function' && !currentAudio.paused) {
       try {
         currentAudio.pause();
@@ -878,39 +893,114 @@ export function AudioProvider({ children }) {
         console.error('Error pausing audio:', err);
       }
     }
-  }, [setIsPlaying]); // Dependency on setIsPlaying
+  };
 
   // Function to resume the currently paused audio
-  const resumeAudio = useCallback(() => {
-    const currentAudio = audioRef.current; // Get the potentially active audio element
+  // Function to resume the currently paused audio (useCallback removed)
+  const resumeAudio = () => {
+    // Select the correct audio element based on platform
+    const currentAudio = isIOS ? audioRef.current : audioElementRef.current;
+    
+    console.log('[AudioContext] Attempting to resume audio:', {
+      audioExists: !!currentAudio,
+      isPaused: currentAudio?.paused,
+      hasPlayMethod: typeof currentAudio?.play === 'function'
+    });
+    
     if (currentAudio && typeof currentAudio.play === 'function' && currentAudio.paused) {
-      currentAudio.play().then(() => {
-        setIsPlaying(true); // Update state to reflect playback
-        console.log('Audio resumed via context function');
-      }).catch(err => console.error('Error resuming audio:', err));
+      try {
+        // Check if the audio context is suspended and resume it first
+        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+          audioContextRef.current.resume().then(() => {
+            console.log('[AudioContext] AudioContext resumed, now playing audio');
+            currentAudio.play()
+              .then(() => {
+                setIsPlaying(true);
+                console.log('[AudioContext] Audio resumed successfully');
+              })
+              .catch(err => {
+                console.error('[AudioContext] Error playing audio after context resume:', err);
+              });
+          }).catch(err => {
+            console.error('[AudioContext] Error resuming audio context:', err);
+          });
+        } else {
+          // Audio context is already running, play directly
+          currentAudio.play()
+            .then(() => {
+              setIsPlaying(true);
+              console.log('[AudioContext] Audio resumed successfully');
+            })
+            .catch(err => {
+              console.error('[AudioContext] Error playing audio:', err);
+            });
+        }
+      } catch (err) {
+        console.error('[AudioContext] Error in resumeAudio:', err);
+      }
+    } else if (currentAudio && !currentAudio.paused) {
+      console.log('[AudioContext] Audio is already playing, no need to resume');
+    } else {
+      console.warn('[AudioContext] Cannot resume audio: No valid audio element found or play method missing');
     }
-  }, [setIsPlaying]); // Dependency on setIsPlaying
+  };
+
+  // Functions to store and restore audio state for data perception toggle
+  const storeAudioStateBeforeToggle = useCallback(() => {
+    // Store current audio state
+    const currentAudio = isIOS ? audioRef.current : audioElementRef.current;
+    if (currentAudio) {
+      setWasPlayingBeforeToggle(isPlaying);
+      setAudioPositionBeforeToggle(currentAudio.currentTime || 0);
+      console.log('[AudioContext] Stored audio state:', {
+        wasPlaying: isPlaying,
+        position: currentAudio.currentTime || 0
+      });
+    }
+  }, [isPlaying, isIOS]);
+
+  const restoreAudioStateAfterToggle = useCallback(() => {
+    // Restore audio state
+    const currentAudio = isIOS ? audioRef.current : audioElementRef.current;
+    console.log('[AudioContext] Restoring audio state:', {
+      wasPlaying: wasPlayingBeforeToggle,
+      position: audioPositionBeforeToggle
+    });
+    
+    if (currentAudio && wasPlayingBeforeToggle) {
+      // Set the current time if available
+      if (typeof currentAudio.currentTime === 'number' && audioPositionBeforeToggle > 0) {
+        currentAudio.currentTime = audioPositionBeforeToggle;
+      }
+      
+      // Resume playback if it was playing before
+      resumeAudio(); // Use the existing resumeAudio function
+    }
+  }, [wasPlayingBeforeToggle, audioPositionBeforeToggle, isIOS, resumeAudio]);
 
 
+  const providerValue = {
+    // playNarration, // Removed as the function is commented out
+    stopNarration,
+    handleNarrationEnd,
+    getAudioInstance,
+    getAnalyzerData,
+    isPlaying,
+    currentTrack,
+    currentDialogue,
+    isIOS,
+    analyzer: analyzerRef.current,
+    isMuted, // Expose mute state
+    toggleMute, // Expose toggle function
+    playAudioFile, // Expose new function
+    pauseAudio, // Expose pause function
+    resumeAudio: resumeAudio, // Expose resume function
+    storeAudioStateBeforeToggle: storeAudioStateBeforeToggle, // Expose new function
+    restoreAudioStateAfterToggle: restoreAudioStateAfterToggle // Expose new function
+  };
 
   return (
-    <AudioContext.Provider value={{
-      // playNarration, // Removed as the function is commented out
-      stopNarration,
-      handleNarrationEnd,
-      getAudioInstance,
-      getAnalyzerData,
-      isPlaying,
-      currentTrack,
-      currentDialogue,
-      isIOS,
-      analyzer: analyzerRef.current,
-      isMuted, // Expose mute state
-      toggleMute, // Expose toggle function
-      playAudioFile, // Expose new function
-      pauseAudio, // Expose pause function
-      resumeAudio // Expose resume function
-    }}>
+    <AudioContext.Provider value={providerValue}>
       {children}
     </AudioContext.Provider>
   );

@@ -1,0 +1,19 @@
+.statusBarContainer {
+  position: fixed;
+  top: 5px; /* Position closer to the top */
+  left: 0;
+  right: 0;
+  transform: none; /* Remove horizontal centering */
+  width: 100%; /* Span full width */
+  display: flex;
+  justify-content: space-between; /* Spread indicators across the container */
+  align-items: flex-start; /* Align items to the top */
+  z-index: 100; /* Ensure it's above Scene3D but potentially below other overlays if needed */
+  padding: 5px 15px; /* Add horizontal padding */
+  /* background-color: rgba(0, 10, 20, 0.5); Removed background */
+  /* border-radius: 5px; Removed border-radius */
+  pointer-events: none; /* Allow clicks to pass through */
+}
+
+/* Add media queries for responsiveness if needed */
+/* @media (max-width: 768px) { ... } */

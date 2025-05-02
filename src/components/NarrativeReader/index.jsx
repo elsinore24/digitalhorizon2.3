@@ -1,10 +1,23 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import useAudio from '../../hooks/useAudio';
+import useAutoScroll from '../../hooks/useAutoScroll';
 import styles from './NarrativeReader.module.scss';
 
-const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Remove props
+import { useGameStore } from '../../store/useGameStore'; // Import useGameStore as a named import
+
+// Remove narrativeId and onComplete props, use dataPerceptionMode
+const NarrativeReader = ({
+  dataPerceptionMode,
+  narrativeToLoad, // Accept the new prop
+}) => {
+  // Access currentNodeId, updateGameState, and setActiveTuningChallenge from Zustand store
+  const { currentNodeId, updateGameState, setActiveTuningChallenge } = useGameStore(state => ({
+    currentNodeId: state.gameState.currentNodeId,
+    updateGameState: state.updateGameState,
+    setActiveTuningChallenge: state.setActiveTuningChallenge,
+  }));
+
   const [narrativeData, setNarrativeData] = useState(null);
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const {
@@ -12,92 +25,292 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Re
     pauseAudio,
     resumeAudio,
     isPlaying,
-    getAudioInstance
+    getAudioInstance,
+    stopAudio // Add stopAudio from useAudio
   } = useAudio();
   const [isPausedByUser, setIsPausedByUser] = useState(false);
-  const [isAutoPageTurnEnabled, setIsAutoPageTurnEnabled] = useState(true);
+  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [imageVisible, setImageVisible] = useState(false);
-  const audioInstanceRef = useRef(null); // Ref to store the audio instance
-  const playPauseButtonRef = useRef(null); // Ref for the play/pause button
-  const initialPlayTriggeredRef = useRef(false); // Ref to track if initial play was triggered
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+  const audioInstanceRef = useRef(null);
+  const currentAudioInstanceRef = useRef(null); // Ref to store the current audio instance
+  const playPauseButtonRef = useRef(null);
+  const initialPlayTriggeredRef = useRef(false);
+  const textContainerRef = useRef(null);
+  const [totalScrollableHeight, setTotalScrollableHeight] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [currentImageUrl, setCurrentImageUrl] = useState(null); // New state for current image
 
-  // Effect to fetch narrative data and start audio
+  // Callback for image synchronization during auto-scroll
+  const syncImageWithScroll = useCallback((currentTime, progress) => {
+    if (narrativeData && narrativeData.pages) {
+      let activePage = null;
+      for (let i = narrativeData.pages.length - 1; i >= 0; i--) {
+        const page = narrativeData.pages[i];
+        if (page.timestamp <= currentTime) {
+          activePage = page;
+          break;
+        }
+      }
+
+      // Update image if the active page has an image and it's different
+      // Use a functional update to avoid needing currentImageUrl in dependencies
+      if (activePage && activePage.imageUrl) {
+        setCurrentImageUrl(prevImageUrl => {
+          if (prevImageUrl !== activePage.imageUrl) {
+            return activePage.imageUrl;
+          }
+          return prevImageUrl; // No change needed
+        });
+      } else if (!activePage) {
+          // If no page is active (before the first timestamp), clear the image
+          setCurrentImageUrl(null);
+      }
+    }
+  }, [narrativeData, setCurrentImageUrl]); // Dependencies for the callback
+
+
+  const {
+    scrollProgress,
+    isScrolling,
+    updateScrollPosition,
+    handleManualScroll,
+    resumeAutoScroll
+  } = useAutoScroll({
+    scrollRef: textContainerRef,
+    audioInstance: getAudioInstance(),
+    isPlaying,
+    isPausedByUser,
+    isAutoScrollEnabled,
+    totalScrollableHeight,
+    audioDuration,
+    onScrollFrame: syncImageWithScroll // Pass the image sync callback
+  });
+
+  // Effect to fetch narrative data and start audio based on narrativeToLoad prop
   useEffect(() => {
-    // Reset state when narrativeId changes or is null
-    setNarrativeData(null);
-    setCurrentPageIndex(0);
-    setIsPausedByUser(false); // Reset pause state
-    setImageVisible(false); // Reset image visibility
+    console.log('[NarrativeReader useEffect] Triggered. narrativeToLoad:', narrativeToLoad); // Update log
 
-    if (!narrativeId) {
+    // Only attempt to fetch if narrativeToLoad is provided
+    if (!narrativeToLoad) {
+      // Reset state if narrativeToLoad becomes null (e.g., when component unmounts or phase changes)
+      setNarrativeData(null);
+      setIsPausedByUser(false); // Reset pause state
+      setImageVisible(false); // Reset image visibility
+      setTotalScrollableHeight(0); // Reset scroll height
+      setAudioDuration(0); // Reset audio duration
+      setCurrentImageUrl(null); // Reset current image
+
       // If there's an active audio instance from a previous narrative, stop it
       if (audioInstanceRef.current && typeof audioInstanceRef.current.pause === 'function') {
          audioInstanceRef.current.pause();
          audioInstanceRef.current.src = ''; // Detach source
          audioInstanceRef.current = null;
-      }
-      // Consider calling a stop function from useAudio if available/needed
+       }
+      // Use stopAudio from useAudio hook if available/needed
+      stopAudio();
       return;
     }
+
+    // Reset state when narrativeToLoad changes
+    setNarrativeData(null);
+    setIsPausedByUser(false); // Reset pause state
+    setImageVisible(false); // Reset image visibility
+    setTotalScrollableHeight(0); // Reset scroll height
+    setAudioDuration(0); // Reset audio duration
+    setCurrentImageUrl(null); // Reset current image
+
 
     const fetchNarrative = async () => {
       setIsLoading(true);
       setError(null);
       setNarrativeData(null); // Clear previous data
-      setCurrentPageIndex(0); // Reset page index on new narrative load
       setIsPausedByUser(false); // Ensure not paused when new narrative starts
+      setCurrentImageUrl(null); // Clear image before fetching new data
+
 
       try {
-        // Assuming narratives are in /public/narratives/
-        const response = await fetch(`/narratives/${narrativeId}.json`);
+        // Assuming narratives are in /public/narratives/ and named after narrativeToLoad
+        const response = await fetch(`/narratives/${narrativeToLoad}.json`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
         setNarrativeData(data);
-        // Trigger audio playback using the narrativeId to construct the correct path
-        // The audio files are stored in public/audio/narration/ with the narrativeId as filename
-        // Revert: Always try to play audio on fetch (unless it's iOS and handled by handleEnter timeout)
-        // We rely on the AudioContext to handle the potential delay/pending state.
+
+        // Check if the loaded narrative data corresponds to a tuning challenge
+        if (data.requiresTuning) {
+            const challengeConfig = {
+                id: data.tuningChallengeId, // e.g., 'LunarSignal1'
+                // Pass specific parameters if needed, or let SignalTuningInterface fetch based on ID
+                baseNoise: data.tuningBaseNoise,
+                interpretations: data.tuningInterpretations,
+             };
+            setActiveTuningChallenge(challengeConfig);
+            console.log("Setting active tuning challenge:", challengeConfig);
+        } else {
+            // If not a tuning challenge, ensure activeTuningChallenge is null
+            setActiveTuningChallenge(null);
+        }
+
+
+        // Set initial image from the first page if available
+        if (data.pages && data.pages.length > 0 && data.pages[0].imageUrl) {
+            setCurrentImageUrl(data.pages[0].imageUrl);
+        } else {
+            // Optionally set a default image if the first page has none
+            // setCurrentImageUrl("/front_pic/default.png");
+        }
+
+
         if (data.audio) {
-           // The playAudioFile call might be deferred by handleEnter on iOS
-           // For non-iOS or subsequent loads, this should play directly.
-           // Let AudioContext handle the actual playback logic based on its state.
-           // playAudioFile(data.audio); // Removed direct call here, handleEnter handles initial iOS play
-           console.log('[NarrativeReader] Narrative fetched, audio path:', data.audio);
-           // Always attempt to load the audio file when narrative data is fetched.
-           // The actual playback start might be deferred or handled by the programmatic click.
            console.log('[NarrativeReader] Narrative fetched, loading audio:', data.audio);
            playAudioFile(data.audio);
         } else {
-          console.warn(`Narrative ${narrativeId} is missing the 'audio' property in its JSON data.`);
+          console.warn(`Narrative ${narrativeToLoad} is missing the 'audio' property in its JSON data.`);
         }
-        
-        // Removed TODO related to data.audio
-        // Removed line: playAudio(data.audio);
+
       } catch (e) {
         console.error("[NarrativeReader] CATCH BLOCK: Failed to fetch narrative:", e); // Add specific log
-        setError(`Failed to load narrative: ${narrativeId}. Error: ${e.message}`);
+        setError(`Failed to load narrative: ${narrativeToLoad}. Error: ${e.message}`);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchNarrative();
-  // Re-add playAudioFile dependency since it's used in the effect
-  }, [narrativeId, playAudioFile]); // Revert: Remove immediatePlaybackNeeded dependency
+  }, [narrativeToLoad, playAudioFile, stopAudio, setActiveTuningChallenge]); // Depend on narrativeToLoad, playAudioFile, stopAudio, and setActiveTuningChallenge
 
-  // Effect to trigger image fade-in
+  // Effect to calculate total scrollable height after narrative data is loaded and rendered
+  useLayoutEffect(() => { // Changed to useLayoutEffect
+    if (narrativeData && textContainerRef.current) {
+      // Ensure content is rendered before calculating
+      const calculateHeight = () => {
+        const scrollHeight = textContainerRef.current.scrollHeight;
+        const clientHeight = textContainerRef.current.clientHeight;
+        const calculatedTotalScrollableHeight = scrollHeight - clientHeight;
+        setTotalScrollableHeight(calculatedTotalScrollableHeight);
+        console.log('[NarrativeReader] Calculated totalScrollableHeight:', calculatedTotalScrollableHeight);
+      };
+
+      // Use a small timeout to ensure DOM is updated after data render
+      const timer = setTimeout(calculateHeight, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [narrativeData]); // Recalculate when narrative data changes
+
+  // Effect to get audio duration
   useEffect(() => {
-    if (narrativeData) { // Only trigger if narrative data is loaded
+    const audioInstance = getAudioInstance();
+    let isMounted = true; // Flag to prevent state updates on unmounted component
+
+    const getDuration = (instance) => {
+      if (!instance) return null; // Add check for null instance
+
+      // Check if duration property exists and is a valid number
+      if (typeof instance.duration === 'number' && instance.duration > 0 && isFinite(instance.duration)) {
+        return instance.duration;
+      }
+
+      // Check if duration method exists and returns a valid number
+      if (typeof instance.duration === 'function') {
+        const funcDuration = instance.duration();
+        if (typeof funcDuration === 'number' && funcDuration > 0 && isFinite(funcDuration)) {
+          return funcDuration;
+        }
+      }
+
+      // If neither is found or valid, return null
+      return null;
+    };
+
+    if (audioInstance) {
+      const handleLoadedMetadata = () => {
+        // Check if component is still mounted before updating state
+        if (isMounted) {
+          const loadedDuration = getDuration(audioInstance);
+          if (loadedDuration !== null) {
+            setAudioDuration(loadedDuration);
+            console.log('[NarrativeReader] Audio duration available after loadedmetadata:', loadedDuration);
+          } else {
+             console.warn('[NarrativeReader] Audio duration from loadedmetadata is invalid or not available.');
+          }
+        }
+      };
+
+      // Check if duration is already available (e.g., if audio was cached)
+      const initialDuration = getDuration(audioInstance);
+      if (initialDuration !== null) {
+         if (isMounted) {
+            setAudioDuration(initialDuration);
+            console.log('[NarrativeReader] Audio duration available immediately:', initialDuration);
+         }
+      } else {
+          // If not immediately available, listen for 'loadedmetadata' or 'load'
+          console.warn('[NarrativeReader] Audio duration not immediately available. Adding listener.');
+          // Use 'loadedmetadata' for HTMLAudioElement, 'load' for Howler.js
+          // Determine the correct event name based on the instance type
+          const eventName = typeof audioInstance.duration === 'function' ? 'load' : 'loadedmetadata';
+          // Ensure the instance has the addEventListener method before using it
+          if (typeof audioInstance.addEventListener === 'function') {
+             audioInstance.addEventListener(eventName, handleLoadedMetadata);
+          } else if (typeof audioInstance.on === 'function') {
+             // Handle cases where it might use .on/.off (like Howler v2)
+             audioInstance.on(eventName, handleLoadedMetadata);
+          } else {
+             console.warn('[NarrativeReader] Audio instance does not support standard event listeners (addEventListener/on). Cannot track loadedmetadata.');
+          }
+
+
+          // Cleanup listener
+          return () => {
+            isMounted = false; // Set flag to false on cleanup
+            if (typeof audioInstance.removeEventListener === 'function') {
+               audioInstance.removeEventListener(eventName, handleLoadedMetadata);
+            } else if (typeof audioInstance.off === 'function') {
+               audioInstance.off(eventName, handleAudioEnd); // Note: This should be handleLoadedMetadata, not handleAudioEnd
+            }
+          };
+      }
+
+      // Cleanup function for the case where duration was immediately available
+      return () => {
+        isMounted = false;
+      };
+
+    }
+
+    // Cleanup if audioInstance is null
+    return () => {
+      isMounted = false;
+    };
+
+  }, [getAudioInstance, narrativeData]); // Depend on getAudioInstance and narrativeData
+
+  // Effect to show/hide scroll indicator
+  useEffect(() => {
+    if (isAutoScrollEnabled && isScrolling) {
+      setShowScrollIndicator(true);
+      const timer = setTimeout(() => setShowScrollIndicator(false), 2000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowScrollIndicator(false);
+    }
+  }, [isAutoScrollEnabled, isScrolling]);
+
+
+  // Effect to trigger image fade-in (now controlled by currentImageUrl)
+  useEffect(() => {
+    if (currentImageUrl) { // Only trigger if there's a current image URL
       const timer = setTimeout(() => {
         setImageVisible(true);
       }, 100); // Short delay to ensure rendering before transition starts
-      return () => clearTimeout(timer); // Cleanup on unmount or narrative change
+      return () => clearTimeout(timer); // Cleanup on unmount or image change
     } else {
-      setImageVisible(false); // Reset if narrative is cleared
+      setImageVisible(false); // Reset if image is cleared
     }
-  }, [narrativeData]); // Depend on narrativeData
+  }, [currentImageUrl]); // Depend on currentImageUrl
+
 
   // Effect to programmatically click Play/Pause on initial iOS load
   useEffect(() => {
@@ -105,7 +318,7 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Re
     // Trigger only once on iOS when narrative data is loaded and button ref exists
     if (isIOS && narrativeData && playPauseButtonRef.current && !initialPlayTriggeredRef.current) {
       console.log('[NarrativeReader] iOS detected, narrative loaded. Attempting programmatic click on Play/Pause.');
-      
+
       // Set flag immediately to prevent re-triggering
       initialPlayTriggeredRef.current = true;
 
@@ -123,89 +336,61 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Re
     }
   }, [narrativeData]); // Depend only on narrativeData to trigger after load
 
-  // Reset the trigger flag if the narrative changes
+  // Reset the trigger flag if the narrative changes (based on narrativeToLoad)
   useEffect(() => {
     initialPlayTriggeredRef.current = false;
-  }, [narrativeId]);
-  // Define handleTimeUpdate using useCallback before the effect
-  const handleTimeUpdate = useCallback(() => {
-    const audioInstance = audioInstanceRef.current; // Use the ref here
-    // Check audioInstance exists before accessing properties
-    if (!audioInstance || !narrativeData || !isAutoPageTurnEnabled || isPausedByUser) return;
+  }, [narrativeToLoad]); // Depend on narrativeToLoad
 
-    const currentTime = audioInstance.currentTime;
-    let newPageIndex = 0;
-
-    // Ensure pages exist before iterating
-    if (!narrativeData.pages) return;
-
-    // Find the latest page whose timestamp is less than or equal to the current time
-    for (let i = narrativeData.pages.length - 1; i >= 0; i--) {
-      // Ensure timestamp exists and is a number
-      if (typeof narrativeData.pages[i]?.timestamp === 'number' && narrativeData.pages[i].timestamp <= currentTime) {
-        newPageIndex = i;
-        break;
-      }
-    }
-
-    // Update the page index if it's different from the current one
-    setCurrentPageIndex(prevIndex => {
-      if (newPageIndex !== prevIndex) {
-        // console.log(`Time: ${currentTime.toFixed(2)}s, Auto-turning to page: ${newPageIndex + 1}`);
-        return newPageIndex;
-      }
-      return prevIndex; // No change needed
-    });
-  }, [narrativeData, isAutoPageTurnEnabled, isPausedByUser, setCurrentPageIndex]); // Dependencies for useCallback
-
-  // Effect for handling audio time updates and auto page turning
+  // Effect for handling narrative completion
   useEffect(() => {
-    // Get the audio instance *once* when the effect runs or dependencies change
-    const audioInstance = getAudioInstance();
-    audioInstanceRef.current = audioInstance; // Store instance in ref
-
-    if (!isPlaying || !narrativeData || !isAutoPageTurnEnabled || isPausedByUser || !audioInstance) {
-      // If not playing, no data, auto-turn disabled, paused by user, or no audio instance, clean up listener if needed
-      if (audioInstance) { // Check if we have an instance to remove listener from
-         // Use the stable handleTimeUpdate from useCallback
-         audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
-      }
-      return; // Exit effect
+    const audioInstance = getAudioInstance(); // Use getAudioInstance to get the current instance
+    // Check if audioInstance and narrativeData are available
+    if (!audioInstance || !narrativeData) {
+      return; // Exit if no audio or data
     }
 
-    // Ensure pages have timestamps (moved check after getting audioInstance)
-    if (!narrativeData.pages || !narrativeData.pages.every(p => typeof p.timestamp === 'number')) {
-      console.warn("Narrative pages are missing timestamps. Auto page turning disabled.");
-      return; // Exit effect
-    }
+    const handleAudioEnd = () => {
+      console.log('[NarrativeReader] Audio ended. Advancing narrative.');
+      // Get the latest state using get() from Zustand
+      const state = useGameStore.getState();
+      const currentGameState = state.gameState;
 
-    // Add the listener using the stable handleTimeUpdate
-    // console.log("Adding timeupdate listener");
-    audioInstance.addEventListener('timeupdate', handleTimeUpdate);
+      // TODO: Determine the next node ID based on narrative logic/choices
+      // For now, we'll use a placeholder or logic based on the *current* node if needed
+      // const nextNodeId = determineNextNode(currentGameState.currentNodeId); // Example logic
+      const nextNodeId = 'next_narrative_node'; // Placeholder - replace with actual logic
 
-    // Cleanup function also uses the stable handleTimeUpdate
-    return () => {
-      // console.log("Removing timeupdate listener");
-      // Check if audioInstance exists before removing listener
-      if (audioInstance) {
-         audioInstance.removeEventListener('timeupdate', handleTimeUpdate);
-      }
-      // Don't nullify audioInstanceRef here, might be needed elsewhere
+      // Update currentNodeId in Zustand
+      updateGameState({ currentNodeId: nextNodeId });
     };
-    // Updated dependencies: include the stable handleTimeUpdate
-  }, [isPlaying, narrativeData, isAutoPageTurnEnabled, isPausedByUser, getAudioInstance, handleTimeUpdate]);
 
-  const handleNextPage = () => {
-    if (narrativeData && currentPageIndex < narrativeData.pages.length - 1) {
-      setCurrentPageIndex(prevIndex => prevIndex + 1);
-    }
-  };
+    // Howler uses 'end', HTMLAudioElement uses 'ended'
+    const eventName = 'end'; // Assuming useAudio provides a Howler instance or similar event emitter
 
-  const handlePrevPage = () => {
-    if (currentPageIndex > 0) {
-      setCurrentPageIndex(prevIndex => prevIndex - 1);
+    // Ensure addEventListener/removeEventListener exist on the instance
+    if (typeof audioInstance.addEventListener === 'function' && typeof audioInstance.removeEventListener === 'function') {
+       audioInstance.addEventListener(eventName, handleAudioEnd);
+    } else if (typeof audioInstance.on === 'function' && typeof audioInstance.off === 'function') {
+       // Handle cases where it might use .on/.off (like Howler v2)
+       audioInstance.on(eventName, handleAudioEnd);
+    } else {
+       console.warn('[NarrativeReader] Audio instance does not support standard event listeners (addEventListener/on). Cannot track end.');
+       return; // Cannot proceed without event listeners
     }
-  };
+
+    return () => {
+      if (audioInstance) {
+        if (typeof audioInstance.removeEventListener === 'function') {
+           audioInstance.removeEventListener(eventName, handleAudioEnd);
+        } else if (typeof audioInstance.off === 'function') {
+           audioInstance.off(eventName, handleAudioEnd);
+        }
+      }
+    };
+    // Re-run if audio instance changes, narrative changes, or updateGameState changes
+  }, [narrativeData, getAudioInstance, updateGameState]);
+
+
   // Handler for the Play/Pause button
   const handlePlayPause = () => {
     if (isPlaying && !isPausedByUser) {
@@ -217,10 +402,28 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Re
     }
   };
 
-  // Handler for the Auto Page Turn toggle
-  const handleToggleAutoPageTurn = () => {
-    setIsAutoPageTurnEnabled(prev => !prev);
+  // Handler for the Auto Scroll toggle with momentum effect
+  const handleToggleAutoScroll = () => {
+    const newState = !isAutoScrollEnabled;
+    setIsAutoScrollEnabled(newState);
+
+    if (newState && textContainerRef.current) {
+      // When enabling, smoothly scroll to current audio position
+      const audioInstance = getAudioInstance();
+      if (audioInstance) {
+        const currentTime = audioInstance.seek ? audioInstance.seek() : audioInstance.currentTime;
+        const progress = Math.min(1, Math.max(0, currentTime / audioDuration));
+        const targetScrollTop = totalScrollableHeight * progress;
+
+        // Smooth scroll with easing
+        textContainerRef.current.scrollTo({
+          top: targetScrollTop,
+          behavior: 'smooth'
+        });
+      }
+    }
   };
+
 
   if (isLoading) {
     return <div className={styles.loading}>Loading Narrative...</div>;
@@ -234,11 +437,8 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Re
     return null; // Or some placeholder if needed when no narrative is active
   }
 
-  // Ensure currentPageText is accessed safely, considering the new structure
-  const currentPageData = narrativeData.pages[currentPageIndex];
-  const currentPageText = currentPageData ? currentPageData.text : '';
-  const isFirstPage = currentPageIndex === 0;
-  const isLastPage = currentPageIndex === narrativeData.pages.length - 1;
+  // Safely access page data and text (still using pages structure for content)
+  const pagesExist = narrativeData && Array.isArray(narrativeData.pages) && narrativeData.pages.length > 0;
 
   return (
     <div
@@ -246,31 +446,33 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Re
     >
       {/* Use a Fragment to return multiple elements */}
       <>
-        {/* NEW: Image Container */}
-        {narrativeData && ( // Only show image container if there's a narrative
+        {/* Image Container - Now outside narrativeBox */}
+        {/* Render image only if currentImageUrl is set */}
+        {currentImageUrl && (
           <div className={`${styles.lunarImageContainer} ${imageVisible ? styles.fadeInActive : ''}`}>
-            <img src="/front_pic/moon.png" alt="Lunar surface" className={styles.lunarImage} />
+            <img src={currentImageUrl} alt="Narrative background" className={styles.lunarImage} /> {/* Use currentImageUrl */}
           </div>
         )}
 
-        {/* Existing Narrative Box */}
-        {narrativeData && ( // Conditionally render narrative box as well
+        {/* Narrative Box */}
+        {narrativeData && (
           <div className={styles.narrativeBox}>
-            {/* Add Arrow Buttons */}
-            <button className={styles.prevArrow} onClick={handlePrevPage} disabled={isFirstPage}>&lt;</button>
-            <button className={styles.nextArrow} onClick={handleNextPage} disabled={isLastPage}>&gt;</button>
 
-            <div className={styles.narrativeText}>
-              {currentPageText}
+            {/* Arrow Buttons - Removed */}
+
+            <div
+              className={styles.narrativeText}
+              ref={textContainerRef}
+              onScroll={handleManualScroll}
+            >
+              {/* Render all page text sequentially */}
+              {pagesExist && narrativeData.pages.map((page, i) => (
+                <div key={i} className={styles.pageContent}>
+                  {page.text}
+                </div>
+              ))}
             </div>
             <div className={styles.navigation}>
-              {/* Previous Button Removed */}
-
-              {/* Page Info */}
-              <span>Page {currentPageIndex + 1} of {narrativeData.pages.length}</span>
-
-              {/* Next Button Removed */}
-
               {/* Play/Pause Button with Ref */}
               {narrativeData && ( // Render when narrative is loaded
                  <button ref={playPauseButtonRef} onClick={handlePlayPause}>
@@ -278,15 +480,21 @@ const NarrativeReader = ({ narrativeId, dataPerceptionMode }) => { // Revert: Re
                  </button>
               )}
 
-              {/* Auto Page Turn Toggle */}
+              {/* Auto Scroll Toggle */}
               <label className={styles.toggleLabel}>
                 <input
                   type="checkbox"
-                  checked={isAutoPageTurnEnabled}
-                  onChange={handleToggleAutoPageTurn}
+                  checked={isAutoScrollEnabled} // Updated state
+                  onChange={handleToggleAutoScroll} // Updated handler
                 />
-                Auto Turn Pages
+                Auto Scroll {/* Updated label text */}
               </label>
+
+              {/* Scroll Indicator */}
+              <div className={`${styles.scrollIndicator} ${showScrollIndicator ? styles.visible : ''}`}>
+                Auto-scrolling...
+              </div>
+
             </div>
           </div>
         )}
