@@ -26,7 +26,7 @@ export function AudioProvider({ children }) {
   const audioContextRef = useRef(null)
   const audioElementRef = useRef(null)
   const analyzerRef = useRef(null)
-  const mediaStreamSourceRef = useRef(null)
+  const mediaElementSourceRef = useRef(null) // Renamed for clarity - this is the MediaElementAudioSourceNode
   const masterGainNodeRef = useRef(null); // Add ref for master gain
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [pendingPlayback, setPendingPlayback] = useState(null); // State for deferred playback { url, dialogueId, dialogue, isTone }
@@ -151,58 +151,80 @@ export function AudioProvider({ children }) {
     }
   }, []);
   
-  // Connect analyzer to audio element - use a stable reference with useRef
-  // This function doesn't depend on any state, only refs, so it doesn't need to be recreated
-  const connectAnalyzerToAudioRef = useRef((audioElement) => {
-    if (!audioElement || !audioContextRef.current) return;
-    
+  // --- 1. Dedicated Disconnect Function ---
+  const disconnectSourceNode = useCallback(() => {
+    if (mediaElementSourceRef.current) {
+      try {
+        console.log('[AudioContext] Disconnecting existing media source node.');
+        mediaElementSourceRef.current.disconnect(); // Disconnect from all destinations
+      } catch (e) {
+        // Log warning, but proceed to clear ref
+        console.warn('[AudioContext] Error during source node disconnect:', e);
+      } finally {
+        // CRITICAL: Always clear the reference
+        mediaElementSourceRef.current = null;
+        console.log('[AudioContext] Media source node reference cleared.');
+      }
+    } else {
+      console.log('[AudioContext] No existing media source node ref to disconnect/clear.');
+    }
+  }, []);
+
+  // Setup audio nodes function - creates a fresh audio graph for each track
+  const setupAudioNodesRef = useRef(() => {
+    if (!audioContextRef.current || !audioElementRef.current || !masterGainNodeRef.current) {
+      console.error('[AudioContext] Cannot setup nodes: Context, Element, or Gain missing.');
+      return false;
+    }
+
+    // CRITICAL CHECK: Ensure previous node ref is null before creating new one
+    if (mediaElementSourceRef.current !== null) {
+      console.error('[AudioContext] Cannot setup nodes: mediaElementSourceRef was not null! Attempting forced cleanup.');
+      // Attempt cleanup again just in case, though this indicates a logic flaw elsewhere
+      disconnectSourceNode();
+    }
+
     try {
+      console.log('[AudioContext] Creating NEW MediaElementAudioSourceNode.');
+      // --- Force creation of NEW source node ---
+      mediaElementSourceRef.current = audioContextRef.current.createMediaElementSource(audioElementRef.current);
+
       // Create analyzer if it doesn't exist
       if (!analyzerRef.current) {
         analyzerRef.current = audioContextRef.current.createAnalyser();
         analyzerRef.current.fftSize = 256;
         analyzerRef.current.smoothingTimeConstant = 0.8; // Add smoothing for better visualization
       }
+
+      console.log('[AudioContext] Connecting NEW source node -> Analyzer -> Master Gain -> Destination.');
+      // Connect source -> analyzer -> gain -> destination
+      mediaElementSourceRef.current.connect(analyzerRef.current);
       
-      // Handle media stream source connection
-      try {
-        // If we already have a media source, try to disconnect it first to avoid errors
-        if (mediaStreamSourceRef.current) {
-          try {
-            mediaStreamSourceRef.current.disconnect();
-            console.log('Disconnected existing media source');
-          } catch (disconnectErr) {
-            console.log('Media source might already be disconnected:', disconnectErr.message);
-          }
-        }
-        
-        // Create a new media stream source
-        mediaStreamSourceRef.current = audioContextRef.current.createMediaElementSource(audioElement);
-        console.log('Created new media element source');
-        
-        // Connect the media source to the analyzer and destination
-        mediaStreamSourceRef.current.connect(analyzerRef.current);
-        analyzerRef.current.connect(masterGainNodeRef.current); // Connect analyzer to gain node
-        console.log('Audio analyzer connected successfully');
-      } catch (sourceErr) {
-        // If we get an error about the element already being connected, that's actually okay
-        if (sourceErr.message && sourceErr.message.includes('already connected')) {
-          console.log('Audio element already connected to a node, which is fine');
-          
-          // Make sure analyzer is connected to destination
-          try {
-            analyzerRef.current.connect(masterGainNodeRef.current); // Connect analyzer to gain node
-          } catch (connectErr) {
-            // Ignore if already connected
-            console.log('Analyzer might already be connected to destination');
-          }
-        } else {
-          throw sourceErr; // Re-throw if it's a different error
-        }
-      }
-    } catch (err) {
-      console.error('Failed to connect analyzer:', err);
+      // Reconnect gain node to destination (disconnect first to avoid duplicate connections)
+      analyzerRef.current.disconnect(); // Disconnect analyzer from previous connections first
+      analyzerRef.current.connect(masterGainNodeRef.current);
+      
+      // Reconnect gain node to destination (disconnect first to avoid duplicate connections)
+      masterGainNodeRef.current.disconnect(); // Disconnect gain from previous connections first
+      masterGainNodeRef.current.connect(audioContextRef.current.destination);
+      
+      console.log('[AudioContext] NEW source node connected successfully.');
+      return true;
+
+    } catch (error) {
+      console.error('[AudioContext] Error creating/connecting media element source:', error);
+      mediaElementSourceRef.current = null; // Nullify on error
+      return false;
     }
+  });
+
+  // Connect analyzer to audio element - use a stable reference with useRef
+  // This function is kept for backward compatibility but now uses setupAudioNodesRef
+  const connectAnalyzerToAudioRef = useRef((audioElement) => {
+    if (!audioElement || !audioContextRef.current) return;
+    
+    console.log('[AudioContext] connectAnalyzerToAudioRef called - delegating to setupAudioNodesRef');
+    return setupAudioNodesRef.current();
   });
   
   // Wrapper function to maintain API compatibility
@@ -358,9 +380,9 @@ export function AudioProvider({ children }) {
       // Only clean up resources, but don't close the global audio context
       
       // Disconnect media source if it exists
-      if (mediaStreamSourceRef.current) {
+      if (mediaElementSourceRef.current) {
         try {
-          mediaStreamSourceRef.current.disconnect();
+          mediaElementSourceRef.current.disconnect();
           console.log('Media source disconnected during cleanup');
         } catch (e) {
           // Ignore disconnection errors
@@ -385,46 +407,102 @@ export function AudioProvider({ children }) {
   }, [isIOS]); // Only depend on isIOS, other functions are stable refs
 
   // Effect to handle pending playback when context resumes
-  // Play audio using HTML5 Audio element
+  // Play audio using HTML5 Audio element with improved node setup
   // Create stable function references using useRef
   const playAudioWithElementRef = useRef((url, dialogueId, dialogue) => {
     if (!audioElementRef.current) return false;
     
     try {
-      console.log(`[playAudioWithElementRef] Attempting to set src: ${url}`); // Added logging
+      console.log(`[playAudioWithElementRef] Attempting to play: ${url}`);
+      
+      // --- Stop current playback & Disconnect ---
+      console.log('[AudioContext] Pausing audio element.');
+      audioElementRef.current.pause();
+      disconnectSourceNode(); // Disconnect and clear ref *before* setting new src
+      
+      // --- Prep Gain ---
+      if (audioContextRef.current && masterGainNodeRef.current) {
+        const now = audioContextRef.current.currentTime;
+        console.log('[AudioContext] Ensuring master gain is 1.');
+        masterGainNodeRef.current.gain.cancelScheduledValues(now);
+        masterGainNodeRef.current.gain.setValueAtTime(1, now); // Set gain immediately
+      }
+      
+      // Set the source - this triggers loading
       audioElementRef.current.src = url;
       audioRef.current = audioElementRef.current; // Ensure getAudioInstance returns the correct element
-      audioElementRef.current.onloadeddata = () => {
-        console.log('[playAudioWithElementRef] Audio loaded:', dialogueId); // Modified logging
-        setCurrentDialogue(dialogue);
-        
-        // Connect analyzer to the audio element
-        connectAnalyzerToAudioRef.current(audioElementRef.current);
-        
-        // Play the audio only if context is running
-        if (audioContextRef.current && audioContextRef.current.state === 'running') {
-          audioElementRef.current.play()
-            .then(() => {
-              console.log('Audio playing:', dialogueId);
-              setIsPlaying(true);
-              setCurrentTrack(dialogueId);
-            })
-            .catch(err => {
-              console.error('Error playing audio:', err);
-              // Consider resetting state here if play fails
-            });
-        } else {
-          console.warn('Audio context not running. Storing playback request.');
-          setPendingPlayback({ url, dialogueId, dialogue, isTone: false }); // Store details for later playback
-          audioContextRef.current?.resume(); // Attempt to resume context again
-          setIsPlaying(false); // Ensure isPlaying is false if context isn't ready
-        }
+      
+      // --- Event listener to setup nodes and play ---
+      const handleCanPlay = () => {
+        audioElementRef.current.removeEventListener('canplay', handleCanPlay); // Cleanup self
+        console.log(`[AudioContext] 'canplay' event received for ${url}. Delaying node setup & play.`);
+
+        // --- Introduce Delay ---
+        setTimeout(() => {
+          console.log('[AudioContext] Executing delayed node setup & play.');
+
+          // Check if element still exists (might have unmounted during delay)
+          if (!audioElementRef.current) {
+            console.warn('[AudioContext] Audio element became null during delay. Aborting.');
+            return;
+          }
+
+          // Now, attempt node setup and playback
+          if (setupAudioNodesRef.current()) { // setupAudioNodesRef.current remains synchronous
+            console.log('[AudioContext] Nodes setup complete (delayed). Setting dialogue and attempting playback.');
+            setCurrentDialogue(dialogue);
+            
+            // Play the audio only if context is running
+            if (audioContextRef.current && audioContextRef.current.state === 'running') {
+              const playPromise = audioElementRef.current.play();
+              if (playPromise !== undefined) {
+                playPromise.then(_ => {
+                  console.log('[AudioContext] Playback started successfully (Promise resolved).');
+                  setIsPlaying(true);
+                  setCurrentTrack(dialogueId);
+                }).catch(error => {
+                  console.error('[AudioContext] Playback initiation failed:', error);
+                  // Reset state if play fails
+                  setIsPlaying(false);
+                  setCurrentTrack(null);
+                  // Call the completion callback on error
+                  if (audioCompletionCallbackRef.current) {
+                    audioCompletionCallbackRef.current();
+                    audioCompletionCallbackRef.current = null;
+                  }
+                });
+              }
+            } else {
+              console.warn('[AudioContext] Audio context not running. Storing playback request.');
+              setPendingPlayback({ url, dialogueId, dialogue, isTone: false }); // Store details for later playback
+              audioContextRef.current?.resume(); // Attempt to resume context again
+              setIsPlaying(false); // Ensure isPlaying is false if context isn't ready
+            }
+          } else {
+            console.error('[AudioContext] Node setup failed (delayed). Playback aborted.');
+            setIsPlaying(false);
+            setCurrentTrack(null);
+          }
+        }, 50); // Delay of 50 milliseconds (can be adjusted if needed)
+        // --- End Delay ---
       };
+      
+      // Remove previous listener if any, before adding new one
+      audioElementRef.current.removeEventListener('canplay', handleCanPlay); // Precautionary remove
+      audioElementRef.current.addEventListener('canplay', handleCanPlay);
+      
+      // Load the audio file
+      console.log(`[AudioContext] Setting src to ${url} and calling load().`);
+      audioElementRef.current.load(); // Explicitly call load()
       
       audioElementRef.current.onended = () => {
         console.log('Audio ended:', dialogueId);
         setIsPlaying(false);
         setCurrentDialogue(null);
+        
+        // We're no longer using the completion callback for narrative advancement
+        // The NarrativeReader component now handles this with its own event listener
+        // This prevents duplicate advancement logic
       };
       
       audioElementRef.current.onerror = (err) => {
@@ -494,27 +572,49 @@ export function AudioProvider({ children }) {
             console.log('[iOS Web Audio] Created Web Audio analyzer');
           }
 
-          // Create MediaElementSource from the iosAudioElement
+          // Create and connect a fresh MediaElementSource for the iosAudioElement
           try {
-            console.log('[iOS Web Audio] Creating MediaElementSource for iosAudioElement');
+            console.log('[iOS Web Audio] Creating NEW MediaElementSource for iosAudioElement');
+            
+            // Disconnect any existing source node first
+            if (iosSourceNode) {
+              try {
+                iosSourceNode.disconnect();
+                console.log('[iOS Web Audio] Disconnected existing iOS source node');
+              } catch (e) {
+                console.warn('[iOS Web Audio] Error disconnecting previous iOS source node:', e);
+              }
+              iosSourceNode = null;
+            }
+            
+            // Create a fresh source node
             iosSourceNode = audioContextRef.current.createMediaElementSource(iosAudioElement);
             
-            // Connect source -> analyzer -> destination
-            iosSourceNode.connect(analyzerRef.current);
-            analyzerRef.current.connect(masterGainNodeRef.current); // Connect analyzer to gain node
-            console.log('[iOS Web Audio] Connected iosAudioElement to analyzer');
+            // Disconnect analyzer before reconnecting to avoid duplicate connections
+            if (analyzerRef.current) {
+              try {
+                analyzerRef.current.disconnect();
+              } catch (e) {
+                // Ignore if not connected
+              }
+            }
             
+            // Connect source -> analyzer -> gain -> destination
+            iosSourceNode.connect(analyzerRef.current);
+            analyzerRef.current.connect(masterGainNodeRef.current);
+            
+            // Make sure gain is connected to destination
+            try {
+              masterGainNodeRef.current.disconnect();
+            } catch (e) {
+              // Ignore if not connected
+            }
+            masterGainNodeRef.current.connect(audioContextRef.current.destination);
+            
+            console.log('[iOS Web Audio] NEW source node connected successfully');
           } catch (sourceErr) {
-             // Handle potential "already connected" errors gracefully
-             if (sourceErr.message && sourceErr.message.includes('already connected')) {
-               console.log('[iOS Web Audio] iosAudioElement already connected to a node.');
-               // Ensure analyzer is connected to destination anyway
-               try {
-                 analyzerRef.current.connect(masterGainNodeRef.current); // Connect analyzer to gain node
-               } catch (connectErr) { /* Ignore */ }
-             } else {
-               throw sourceErr; // Re-throw other errors
-             }
+            console.error('[iOS Web Audio] Error creating/connecting iOS media element source:', sourceErr);
+            return; // Cannot proceed without proper audio setup
           }
           
           // Set current dialogue info
@@ -733,27 +833,29 @@ export function AudioProvider({ children }) {
   // Ref to store the audio completion callback
   const audioCompletionCallbackRef = useRef(null);
 
-  // Create a stable reference for playAudioFile
+  // Create a stable reference for playAudioFile with improved node handling
   const playAudioFileRef = useRef(async (filePath, onComplete) => { // Accept onComplete callback
-    console.log(`[playAudioFileRef] Received filePath: ${filePath}`); // Added logging
+    console.log(`[playAudioFileRef] Received filePath: ${filePath}`);
     if (!filePath) {
-      console.warn('[playAudioFileRef] No filePath provided.'); // Added logging
+      console.warn('[playAudioFileRef] No filePath provided.');
       return;
     }
 
     // Store the completion callback
     audioCompletionCallbackRef.current = onComplete;
 
-    initAudioContext(); // Ensure context is initialized and try resuming if suspended
+    // Ensure audio context is initialized and try resuming if suspended
+    initAudioContext();
+    
+    // Prepare the URL
     let url;
-    // Check if filePath is a data URI
     if (filePath.startsWith('data:audio/')) {
       url = filePath; // Use the data URI directly
-      console.log(`[playAudioFileRef] Detected data URI, url: ${url.substring(0, 50)}...`); // Added logging
+      console.log(`[playAudioFileRef] Detected data URI, url: ${url.substring(0, 50)}...`);
     } else {
       // Construct URL assuming filePath is relative to public root, avoid double slash
       url = filePath.startsWith('/') ? filePath : `/${filePath}`;
-      console.log(`[playAudioFileRef] Constructed URL: ${url}`); // Added logging
+      console.log(`[playAudioFileRef] Constructed URL: ${url}`);
     }
 
     // Placeholder info - might not be needed if playback functions don't rely on it
@@ -766,34 +868,37 @@ export function AudioProvider({ children }) {
         audioRef.current.pause();
         // Check if it's the iOS specific element created by playAudioWithTone and remove it
         if (audioRef.current.id === 'ios-audio-playback-element' && audioRef.current.parentNode) {
-             audioRef.current.parentNode.removeChild(audioRef.current);
+          audioRef.current.parentNode.removeChild(audioRef.current);
         }
         audioRef.current = null; // Clear the ref
       }
+      
       // Also check the main audioElementRef used for non-iOS and analysis
       if (audioElementRef.current && !audioElementRef.current.paused) {
-         audioElementRef.current.pause();
-         audioElementRef.current.src = ''; // Detach source
+        audioElementRef.current.pause();
+        audioElementRef.current.src = ''; // Detach source
       }
+      
       // Reset state *after* stopping
       setIsPlaying(false);
       setCurrentTrack(null);
-      // Avoid clearing currentDialogue here, let the playback functions handle it
-      // setCurrentDialogue(null);
       // --- End Stop Previous Audio ---
 
+      // Use dedicated function to disconnect and clear source node
+      disconnectSourceNode();
 
       // Determine playback method based on iOS or fallback logic
       const isIOSDevice = isIOS; // Capture current value to avoid closure issues
-      console.log(`[playAudioFileRef] isIOSDevice: ${isIOSDevice}`); // Added logging
+      console.log(`[playAudioFileRef] isIOSDevice: ${isIOSDevice}`);
+      
       if (isIOSDevice) {
         // playAudioWithTone creates its own element and connects analyzer
         playAudioWithToneRef.current(url, filePath, tempDialogueInfo); // Use filePath as ID
       } else {
-        // playAudioWithElement uses audioElementRef and calls connectAnalyzerToAudio
+        // playAudioWithElement uses audioElementRef and calls setupAudioNodes
         const elementSuccess = playAudioWithElementRef.current(url, filePath, tempDialogueInfo); // Use filePath as ID
         if (!elementSuccess) {
-           // Fallback could be added here if needed
+          console.error('[playAudioFileRef] Failed to play audio with element');
         }
       }
     } catch (err) {
@@ -810,15 +915,15 @@ export function AudioProvider({ children }) {
     }
   });
 
-  // Function to play narrative audio
+  // Function to play narrative audio with improved node setup
   const playNarrativeAudio = useCallback((filePath, onComplete) => {
-    console.log('[AudioContext] playNarrativeAudio called with:', filePath);
+    console.log(`[AudioContext] playNarrativeAudio called with: ${filePath}`);
     
     // Make sure audio context is running before playing
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume().then(() => {
         console.log('[AudioContext] Audio context resumed before playing narrative audio');
-        // Use the existing playAudioFileRef logic for narrative audio
+        // No need to reset gain here, playAudioFileRef.current does it
         playAudioFileRef.current(filePath, onComplete);
       }).catch(err => {
         console.error('[AudioContext] Failed to resume audio context:', err);
@@ -827,6 +932,7 @@ export function AudioProvider({ children }) {
       });
     } else {
       // Audio context is already running or not available
+      // No need to reset gain here, playAudioFileRef.current does it
       playAudioFileRef.current(filePath, onComplete);
     }
   }, []); // No dependencies needed since we're using refs
@@ -1034,7 +1140,8 @@ export function AudioProvider({ children }) {
     pauseAudio, // Expose pause function
     resumeAudio: resumeAudio, // Expose resume function
     storeAudioStateBeforeToggle: storeAudioStateBeforeToggle, // Expose new function
-    restoreAudioStateAfterToggle: restoreAudioStateAfterToggle // Expose new function
+    restoreAudioStateAfterToggle: restoreAudioStateAfterToggle, // Expose new function
+    disconnectSourceNode // Expose the disconnect function for external use if needed
   };
 
   return (

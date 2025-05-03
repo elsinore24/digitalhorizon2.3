@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect } from 'react'; // Import useCallback and useEffect
 import { BrowserRouter as Router } from 'react-router-dom';
+// Import future flag for React Router v7 compatibility
 import GameContainer from './components/GameContainer';
 import DialogueDisplay from './components/DialogueDisplay';
 // import AudioVisualizer from './components/AudioVisualizer'; // Commented out as per previous state
@@ -141,7 +142,10 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}>
         {/* <GameStateProvider> Removed */}
           <AudioProvider>
             <AppContent />

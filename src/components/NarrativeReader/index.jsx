@@ -20,6 +20,7 @@ const NarrativeReader = ({
   const [narrativeData, setNarrativeData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [currentAudioPath, setCurrentAudioPath] = useState(null); // New state to store the audio path
   const {
     playAudioFile,
     playNarrativeAudio, // Use the new function
@@ -93,9 +94,9 @@ const NarrativeReader = ({
   // Create a ref to track the current narrative
   const currentNarrativeRef = useRef(null);
 
-  // Effect to fetch narrative data and start audio based on narrativeToLoad prop
+  // Effect 1: Fetch narrative data and set the audio path when narrativeToLoad changes
   useEffect(() => {
-    console.log('[NarrativeReader useEffect] Triggered. narrativeToLoad:', narrativeToLoad); // Update log
+    console.log(`[NarrativeReader Effect 1] Triggered. narrativeToLoad: ${narrativeToLoad}`);
 
     // Only attempt to fetch if narrativeToLoad is provided
     if (!narrativeToLoad) {
@@ -106,6 +107,7 @@ const NarrativeReader = ({
       setTotalScrollableHeight(0); // Reset scroll height
       setAudioDuration(0); // Reset audio duration
       setCurrentImageUrl(null); // Reset current image
+      setCurrentAudioPath(null); // Reset audio path
 
       // If there's an active audio instance from a previous narrative, stop it
       if (audioInstanceRef.current && typeof audioInstanceRef.current.pause === 'function') {
@@ -122,7 +124,7 @@ const NarrativeReader = ({
 
     // Skip if we're already loading this narrative
     if (currentNarrativeRef.current === narrativeToLoad && narrativeData) {
-      console.log('[NarrativeReader] Skipping duplicate fetch for:', narrativeToLoad);
+      console.log('[NarrativeReader Effect 1] Skipping duplicate fetch for:', narrativeToLoad);
       return;
     }
     
@@ -135,6 +137,7 @@ const NarrativeReader = ({
     setTotalScrollableHeight(0); // Reset scroll height
     setAudioDuration(0); // Reset audio duration
     setCurrentImageUrl(null); // Reset current image
+    setCurrentAudioPath(null); // Reset audio path before fetching new data
     isNarrativeAudioPlayingRef.current = false; // Reset ref
 
 
@@ -181,62 +184,49 @@ const NarrativeReader = ({
 
 
         if (data.audio) {
-           console.log('[NarrativeReader] Narrative fetched, loading audio:', data.audio);
-           console.log('[NarrativeReader] Before playAudioFile - isPlaying:', isPlaying, 'isPausedByUser:', isPausedByUser);
-           // Define the completion callback
-           const handleAudioCompletion = () => {
-             console.log('[NarrativeReader] Audio playback finished (callback). Checking for next narrative node.');
-             isNarrativeAudioPlayingRef.current = false; // Set ref to false on completion
-
-             // Get the latest state using get() from Zustand
-             const state = useGameStore.getState();
-             const currentGameState = state.gameState;
-
-             // Determine the next node ID based on the 'next' property in the narrative data
-             const nextNodeId = data?.next; // Use 'data' from the fetch scope
-
-             if (!nextNodeId) {
-                 console.warn(`[NarrativeReader] Narrative node ${currentGameState.currentNodeId} has no 'next' property. Narrative ends here.`);
-                 // Optionally handle narrative ending (e.g., show credits, return to main menu)
-                 return; // Stop narrative progression
-             }
-
-             console.log(`[NarrativeReader] Advancing to next node: ${nextNodeId}`);
-
-             // Update currentNodeId in Zustand
-             updateGameState({ currentNodeId: nextNodeId });
-           };
-
-           // Ensure isPausedByUser is false immediately before playing
-           setIsPausedByUser(false);
-           console.log('[NarrativeReader] Before playAudioFile - isPlaying:', isPlaying, 'isPausedByUser:', isPausedByUser);
-           // Play the narrative audio file and pass the completion callback
-           playNarrativeAudio(data.audio, handleAudioCompletion);
-           console.log('[NarrativeReader] After playNarrativeAudio - isPlaying:', isPlaying, 'isPausedByUser:', isPausedByUser);
-           isNarrativeAudioPlayingRef.current = true; // Set ref to true when playback is initiated
+           console.log('[NarrativeReader Effect 1] Narrative fetched, setting audio path:', data.audio);
+           // Instead of playing immediately, just set the audio path
+           // This will trigger Effect 2 which will handle playback
+           setCurrentAudioPath(data.audio);
          } else {
            console.warn(`Narrative ${narrativeToLoad} is missing the 'audio' property in its JSON data.`);
            isNarrativeAudioPlayingRef.current = false; // Set ref to false if no audio
            // If there's no audio, immediately trigger narrative advancement if 'next' exists
            if (data?.next) {
-              console.log('[NarrativeReader] No audio, immediately advancing to next node:', data.next);
+              console.log('[NarrativeReader Effect 1] No audio, immediately advancing to next node:', data.next);
               updateGameState({ currentNodeId: data.next });
            } else {
-              console.warn(`[NarrativeReader] Narrative node ${narrativeToLoad} has no audio and no 'next' property. Narrative ends here.`);
+              console.warn(`[NarrativeReader Effect 1] Narrative node ${narrativeToLoad} has no audio and no 'next' property. Narrative ends here.`);
            }
          }
 
-      } catch (e) {
-        console.error("[NarrativeReader] CATCH BLOCK: Failed to fetch narrative:", e); // Add specific log
-        setError(`Failed to load narrative: ${narrativeToLoad}. Error: ${e.message}`);
-        isNarrativeAudioPlayingRef.current = false; // Ensure ref is false on error
-      } finally {
-        setIsLoading(false);
-      }
-    };
+       } catch (e) {
+         console.error("[NarrativeReader Effect 1] CATCH BLOCK: Failed to fetch narrative:", e);
+         setError(`Failed to load narrative: ${narrativeToLoad}. Error: ${e.message}`);
+         isNarrativeAudioPlayingRef.current = false; // Ensure ref is false on error
+       } finally {
+         setIsLoading(false);
+       }
+     };
 
     fetchNarrative();
-  }, [narrativeToLoad, playNarrativeAudio, stopAudio, setActiveTuningChallenge, updateGameState]); // Removed isPlaying and isPausedByUser from dependencies
+  }, [narrativeToLoad, stopAudio, setActiveTuningChallenge, updateGameState]); // Removed playNarrativeAudio, isPlaying and isPausedByUser from dependencies
+
+  // Effect 2: Attempt to play audio ONLY when path changes AND isPlaying is false
+  useEffect(() => {
+    console.log(`[NarrativeReader Effect 2] Triggered. Path: ${currentAudioPath}, isPlaying: ${isPlaying}`);
+
+    // Check if we have a path AND we are definitively NOT playing
+    if (currentAudioPath && !isPlaying) {
+      console.log(`[NarrativeReader Effect 2] Conditions met. Calling playNarrativeAudio for: ${currentAudioPath}`);
+      playNarrativeAudio(currentAudioPath, null);
+      isNarrativeAudioPlayingRef.current = true; // Set ref to true when playback is initiated
+    } else if (currentAudioPath && isPlaying) {
+      // This case might happen if effects run rapidly. Log it.
+      console.warn(`[NarrativeReader Effect 2] Has path ${currentAudioPath}, but isPlaying is already true. Playback skipped.`);
+      // Decide if you need to stop/reset here, or just wait for 'ended'
+    }
+  }, [currentAudioPath, isPlaying, playNarrativeAudio]); // Depends on path, state, and play function
 
 
   // Effect to calculate total scrollable height after narrative data is loaded and rendered
@@ -379,8 +369,11 @@ const NarrativeReader = ({
     // Trigger only once on iOS when narrative data is loaded, button ref exists,
     // AND audio context is suspended.
     // Also ensure isPlaying is false before attempting to click
-    if (isIOS && narrativeData && playPauseButtonRef.current && !initialPlayTriggeredRef.current && audioContext && audioContext.state === 'suspended' && !isPlaying) {
-      console.log('[NarrativeReader] iOS detected, narrative loaded, and audio context suspended. Attempting programmatic click on Play/Pause to resume.');
+    if (isIOS && narrativeData && currentAudioPath && playPauseButtonRef.current &&
+        !initialPlayTriggeredRef.current && audioContext &&
+        audioContext.state === 'suspended' && !isPlaying) {
+      
+      console.log('[NarrativeReader Effect 5] iOS detected, narrative loaded, audio path ready, and audio context suspended. Attempting programmatic click on Play/Pause to resume.');
 
       // Set flag immediately to prevent re-triggering
       initialPlayTriggeredRef.current = true;
@@ -388,118 +381,154 @@ const NarrativeReader = ({
       // Use a short timeout to ensure the button is fully rendered and interactive
       const clickTimeout = setTimeout(() => {
         if (playPauseButtonRef.current) {
-          console.log('[NarrativeReader] Triggering click on Play/Pause button ref.');
+          console.log('[NarrativeReader Effect 5] Triggering click on Play/Pause button ref.');
           playPauseButtonRef.current.click(); // Simulate click
         } else {
-          console.warn('[NarrativeReader] Play/Pause button ref was null during timeout.');
+          console.warn('[NarrativeReader Effect 5] Play/Pause button ref was null during timeout.');
         }
       }, 100); // 100ms delay, adjust if needed
 
       return () => clearTimeout(clickTimeout); // Cleanup timeout
     }
-    // Removed the erroneous else block here
-  }, [narrativeData, isPlaying, getAudioInstance]); // Depend on narrativeData, isPlaying, and getAudioInstance
+  }, [narrativeData, currentAudioPath, isPlaying, getAudioInstance]); // Added currentAudioPath to dependencies
 
-  // Reset the trigger flag if the narrative changes (based on narrativeToLoad)
+  // Effect 6: Reset the trigger flag if the narrative changes (based on narrativeToLoad)
   useEffect(() => {
+    console.log('[NarrativeReader Effect 6] narrativeToLoad changed, resetting initialPlayTriggeredRef');
     initialPlayTriggeredRef.current = false;
+    // We don't reset currentAudioPath here because that's handled in Effect 1
   }, [narrativeToLoad]); // Depend on narrativeToLoad
 
   // Ref to track if narrative advancement is pending to prevent double triggers
   const narrativeAdvancementPendingRef = useRef(false);
 
-  // Effect to handle narrative completion based on audio 'ended' event
+  // Effect 3: Handle narrative completion based on audio 'ended' event
   useEffect(() => {
     const audioInstance = getAudioInstance();
     let isMounted = true; // Flag to prevent state updates on unmounted component
 
+    // Define the handler INSIDE the effect to ensure it has access to current functions
     const handleAudioEnded = () => {
-      if (isMounted) {
-        console.log('[NarrativeReader] Audio "ended" event triggered. Checking for next narrative node.');
-
-        // Set the pending flag to true immediately
-        narrativeAdvancementPendingRef.current = true;
-
-        // Get the latest state using get() from Zustand
-        const state = useGameStore.getState();
-        const currentGameState = state.gameState;
-
-        // Determine the next node ID based on the 'next' property in the narrative data
-        const nextNodeId = narrativeData?.next;
-
-        if (!nextNodeId) {
-            console.warn(`[NarrativeReader] Narrative node ${currentGameState.currentNodeId} has no 'next' property. Narrative ends here.`);
-            // Optionally handle narrative ending (e.g., show credits, return to main menu)
-            narrativeAdvancementPendingRef.current = false; // Reset flag if narrative ends
-            return; // Stop narrative progression
+        try {
+            if (isMounted) {
+                console.log('[NarrativeReader Effect 3] Audio "ended" event triggered. Resetting state.');
+                
+                // CRITICAL FIX: Use pauseAudio instead of setIsPlaying
+                pauseAudio(); // This will set isPlaying to false internally
+                setIsPausedByUser(false); // Also reset pause state
+                setCurrentAudioPath(null); // Clear the audio path to prevent auto-replay
+        
+                // Set the pending flag to true immediately
+                narrativeAdvancementPendingRef.current = true;
+        
+                // Get the latest state using get() from Zustand
+                const state = useGameStore.getState();
+                const currentGameState = state.gameState;
+                console.log(`[NarrativeReader Effect 3] Current game state node: ${currentGameState.currentNodeId}`);
+        
+                // Determine the next node ID based on the 'next' property in the narrative data
+                const nextNodeId = narrativeData?.next;
+                console.log(`[NarrativeReader Effect 3] Next node from narrative data: ${nextNodeId}`);
+        
+                if (!nextNodeId) {
+                    console.warn(`[NarrativeReader Effect 3] Narrative node ${currentGameState.currentNodeId} has no 'next' property. Narrative ends here.`);
+                    // Optionally handle narrative ending (e.g., show credits, return to main menu)
+                    narrativeAdvancementPendingRef.current = false; // Reset flag if narrative ends
+                    return; // Stop narrative progression
+                }
+        
+                console.log(`[NarrativeReader Effect 3] Advancing to next node: ${nextNodeId}`);
+        
+                // Update currentNodeId in Zustand
+                updateGameState({ currentNodeId: nextNodeId });
+                console.log(`[NarrativeReader Effect 3] Game state update requested for: ${nextNodeId}`);
+        
+                // Reset the pending flag after a short delay to allow state update to propagate
+                setTimeout(() => {
+                    narrativeAdvancementPendingRef.current = false;
+                    console.log('[NarrativeReader Effect 3] Narrative advancement completed.');
+                }, 500); // Adjust delay as needed
+            }
+        } catch (error) {
+            console.error('[NarrativeReader Effect 3] Error in handleAudioEnded:', error);
+            // Attempt to recover by resetting flags
+            narrativeAdvancementPendingRef.current = false;
+            setCurrentAudioPath(null); // Ensure audio path is cleared on error
+            
+            // Try to pause audio anyway in case of error
+            try {
+                pauseAudio();
+            } catch (pauseError) {
+                console.error('[NarrativeReader Effect 3] Error while trying to pause audio during error recovery:', pauseError);
+            }
         }
-
-        console.log(`[NarrativeReader] Advancing to next node: ${nextNodeId}`);
-
-        // Update currentNodeId in Zustand
-        updateGameState({ currentNodeId: nextNodeId });
-
-        // Reset the pending flag after a short delay to allow state update to propagate
-        setTimeout(() => {
-          narrativeAdvancementPendingRef.current = false;
-        }, 500); // Adjust delay as needed
-      }
     };
 
     if (audioInstance && typeof audioInstance.addEventListener === 'function') {
-      audioInstance.addEventListener('ended', handleAudioEnded);
+        console.log('[NarrativeReader Effect 3] Adding "ended" event listener.');
+        audioInstance.addEventListener('ended', handleAudioEnded);
 
-      return () => {
-        isMounted = false;
-        audioInstance.removeEventListener('ended', handleAudioEnded);
-      };
+        return () => {
+            console.log('[NarrativeReader Effect 3] Removing "ended" event listener.');
+            isMounted = false;
+            audioInstance.removeEventListener('ended', handleAudioEnded);
+        };
     } else if (audioInstance && typeof audioInstance.on === 'function') {
-       // Handle cases where it might use .on/.off (like Howler v2)
-       audioInstance.on('end', handleAudioEnded); // Howler.js uses 'end' event
+        // Handle cases where it might use .on/.off (like Howler v2)
+        console.log('[NarrativeReader Effect 3] Adding "end" event listener (Howler style).');
+        audioInstance.on('end', handleAudioEnded); // Howler.js uses 'end' event
 
-       return () => {
-         isMounted = false;
-         audioInstance.off('end', handleAudioEnded);
-       };
+        return () => {
+            console.log('[NarrativeReader Effect 3] Removing "end" event listener (Howler style).');
+            isMounted = false;
+            audioInstance.off('end', handleAudioEnded);
+        };
     } else if (audioInstance) {
-       console.warn('[NarrativeReader] Audio instance does not support standard event listeners (addEventListener/on). Cannot track "ended" event for narrative completion.');
-       
-       // Since we can't use event listeners, set up a polling mechanism to check audio position
-       const checkInterval = 1000; // Check every second
-       const intervalId = setInterval(() => {
-         if (!audioInstance) return;
-         
-         const currentTime = audioInstance.currentTime || 0;
-         const duration = audioInstance.duration || 0;
-         
-         // If we're near the end of the audio (within 0.5 seconds)
-         if (duration > 0 && currentTime > 0 && (duration - currentTime) < 0.5) {
-           handleAudioEnded();
-           clearInterval(intervalId);
-         }
-       }, checkInterval);
-       
-       return () => {
-         clearInterval(intervalId);
-         isMounted = false;
-       };
+        console.warn('[NarrativeReader Effect 3] Audio instance does not support standard event listeners (addEventListener/on). Cannot track "ended" event for narrative completion.');
+        
+        // Since we can't use event listeners, set up a polling mechanism to check audio position
+        console.log('[NarrativeReader Effect 3] Setting up polling mechanism to check audio position.');
+        const checkInterval = 1000; // Check every second
+        const intervalId = setInterval(() => {
+            if (!audioInstance) return;
+            
+            const currentTime = audioInstance.currentTime || 0;
+            const duration = audioInstance.duration || 0;
+            
+            // If we're near the end of the audio (within 0.5 seconds)
+            if (duration > 0 && currentTime > 0 && (duration - currentTime) < 0.5) {
+                console.log('[NarrativeReader Effect 3] Detected end of audio via polling.');
+                handleAudioEnded();
+                clearInterval(intervalId);
+            }
+        }, checkInterval);
+        
+        return () => {
+            console.log('[NarrativeReader Effect 3] Clearing audio position polling interval.');
+            clearInterval(intervalId);
+            isMounted = false;
+        };
     }
 
     // Cleanup if audioInstance is null
     return () => {
-      isMounted = false;
+        console.log('[NarrativeReader Effect 3] Cleanup with no audio instance.');
+        isMounted = false;
     };
 
-  }, [getAudioInstance, narrativeData, updateGameState]); // Depend on getAudioInstance, narrativeData, and updateGameState
+  }, [getAudioInstance, narrativeData, updateGameState, pauseAudio]); // Add pauseAudio to dependencies
 
 
   // Handler for the Play/Pause button
   const handlePlayPause = (event) => {
     event.stopPropagation(); // Stop event propagation
     if (isPlaying && !isPausedByUser) {
+      console.log('[NarrativeReader handlePlayPause] Pausing audio');
       pauseAudio();
       setIsPausedByUser(true);
+      // Don't clear currentAudioPath when pausing, so we can resume
     } else {
+      console.log('[NarrativeReader handlePlayPause] Resuming audio');
       resumeAudio();
       setIsPausedByUser(false); // Set isPausedByUser to false when resuming
     }
@@ -507,10 +536,15 @@ const NarrativeReader = ({
 
   // Effect to update isPausedByUser based on isPlaying
   useEffect(() => {
+    console.log('[NarrativeReader Effect 4] isPlaying changed to:', isPlaying);
     if (isPlaying) {
       setIsPausedByUser(false);
+      // Note: We don't clear currentAudioPath here because it's needed for the audio that's playing
+    } else if (!isPlaying && !isPausedByUser) {
+      // If audio stopped but not because user paused it, it might have ended naturally
+      // We'll let the 'ended' event handler (Effect 3) handle this case and clear currentAudioPath
     }
-  }, [isPlaying]);
+  }, [isPlaying, isPausedByUser]);
 
   // Handler for the Auto Scroll toggle with momentum effect
   const handleToggleAutoScroll = () => {
