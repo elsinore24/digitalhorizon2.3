@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import LunarArrival from '../scenes/LunarArrival'
 import DataPerceptionOverlay from './DataPerceptionOverlay';
+import SignalTuningInterface from './SignalTuningInterface'; // Import SignalTuningInterface
 // import StabilityMeter from './StabilityMeter'; // Remove old import
 import TopStatusBar from './TopStatusBar'; // Import new component
 import NarrationIndicator from './NarrationIndicator';
@@ -19,10 +20,12 @@ export default function GameContainer() {
   const { user } = useAuth();
   const { loadGame } = useDatabase();
 
-  // Get currentView and setView from Zustand store
-  const { currentView, setView } = useGameStore(state => ({
+  // Get currentView, setView, activeTuningChallenge, and advanceNarrativeAction from Zustand store
+  const { currentView, setView, activeTuningChallenge, advanceNarrativeAction } = useGameStore(state => ({
     currentView: state.currentView,
     setView: state.setView,
+    activeTuningChallenge: state.activeTuningChallenge, // Access activeTuningChallenge
+    advanceNarrativeAction: state.advanceNarrativeAction, // Access advanceNarrativeAction
   }));
 
   // Read gameState from Zustand store
@@ -76,6 +79,14 @@ export default function GameContainer() {
       {/* Conditionally render TopStatusBar during specific intro phases */}
       {(gameState.introPhase === 'flashbackNarrative' || gameState.introPhase === 'flashbackChoice') && (
         <TopStatusBar />
+      )}
+
+      {/* Conditionally render SignalTuningInterface */}
+      {activeTuningChallenge && (
+        <SignalTuningInterface
+          challengeConfig={activeTuningChallenge}
+          advanceNarrative={advanceNarrativeAction} // Pass the action from the store
+        />
       )}
 
       {/* Render other UI elements */}

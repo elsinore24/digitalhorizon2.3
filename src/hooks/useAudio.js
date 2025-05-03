@@ -1,5 +1,5 @@
 import { useContext, useCallback, useRef, useEffect } from 'react'
-import { AudioContext } from '../contexts/AudioContext'
+import { AudioContext } from '../contexts/AudioContext' // This import is now correctly using the renamed context
 
 export default function useAudio() {
   // Always use the context at the top level
@@ -14,6 +14,7 @@ export default function useAudio() {
     resumeAudio: context?.resumeAudio,
     getAnalyzerData: context?.getAnalyzerData,
     playAudioFile: context?.playAudioFile,
+    playNarrativeAudio: context?.playNarrativeAudio, // Add playNarrativeAudio from context
     storeAudioStateBeforeToggle: context?.storeAudioStateBeforeToggle,
     restoreAudioStateAfterToggle: context?.restoreAudioStateAfterToggle,
     stopNarration: context?.stopNarration // Add stopNarration from context
@@ -29,8 +30,10 @@ export default function useAudio() {
       resumeAudio: context?.resumeAudio,
       getAnalyzerData: context?.getAnalyzerData,
       playAudioFile: context?.playAudioFile,
+      playNarrativeAudio: context?.playNarrativeAudio, // Add playNarrativeAudio from context
       storeAudioStateBeforeToggle: context?.storeAudioStateBeforeToggle,
-      restoreAudioStateAfterToggle: context?.restoreAudioStateAfterToggle
+      restoreAudioStateAfterToggle: context?.restoreAudioStateAfterToggle,
+      stopNarration: context?.stopNarration // Add stopNarration to the effect update
     };
   }, [
     context?.playNarration,
@@ -40,6 +43,7 @@ export default function useAudio() {
     context?.resumeAudio,
     context?.getAnalyzerData,
     context?.playAudioFile,
+    context?.playNarrativeAudio, // Add playNarrativeAudio to dependencies
     context?.storeAudioStateBeforeToggle,
     context?.restoreAudioStateAfterToggle,
     context?.stopNarration // Add stopNarration to dependencies
@@ -85,9 +89,16 @@ export default function useAudio() {
     return new Float32Array(0);
   }, []);
 
-  const playAudioFile = useCallback((filePath) => {
+  const playAudioFile = useCallback((filePath, onComplete) => {
     if (contextFunctionsRef.current.playAudioFile) {
-      contextFunctionsRef.current.playAudioFile(filePath);
+      contextFunctionsRef.current.playAudioFile(filePath, onComplete);
+    }
+  }, []);
+  
+  // Add playNarrativeAudio function
+  const playNarrativeAudio = useCallback((filePath, onComplete) => {
+    if (contextFunctionsRef.current.playNarrativeAudio) {
+      contextFunctionsRef.current.playNarrativeAudio(filePath, onComplete);
     }
   }, []);
   
@@ -122,6 +133,7 @@ export default function useAudio() {
     isMuted: context ? context.isMuted : false,
     toggleMute,
     playAudioFile,
+    playNarrativeAudio, // Include playNarrativeAudio in the returned object
     pauseAudio,
     resumeAudio,
     storeAudioStateBeforeToggle,

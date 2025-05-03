@@ -7,6 +7,7 @@ const initialGameState = {
     decisionHistory: {},
     hiddenPointScores: { Enlightenment: 0, Trust: 0, Witness: 0, Reality: 100 },
     visibleIndicatorValues: { NeuralStability: 0.95, PhysicalVitality: 'OPTIMAL', ConsciousnessSpectrum: 'SEPARATE' },
+    isRedAlertActive: false, // State flag for Red Alert
     // Add other necessary state fields...
 };
 
@@ -34,6 +35,9 @@ export const useGameStore = create((set, get) => ({
     setGameState: (newState) => set({ gameState: newState, isGameLoaded: true }),
     updateGameState: (updates) => set((state) => ({ gameState: { ...state.gameState, ...updates } })),
     resetGameState: () => set({ gameState: initialGameState, isGameLoaded: false }), // For restarting
+
+    // --- Red Alert Actions ---
+    setRedAlertActive: (isActive) => set({ gameState: { ...get().gameState, isRedAlertActive: isActive } }),
 
     // --- Save/Load Actions ---
     saveGameStateToServer: async () => {
@@ -156,11 +160,11 @@ export const useGameStore = create((set, get) => ({
         let pointsUpdate = { Enlightenment: 0, Trust: 0, Witness: 0, Reality: 0 };
         let indicatorUpdate = { NeuralStability: 0 }; // Change relative to current
 
-        // Example logic for the first signal tuning choice:
-        if (currentNodeId === 'Chapter1_SignalTuning1') { // Assuming this is the ID for the tuning node
+        // Logic for the first signal tuning challenge:
+        if (currentNodeId === 'Chapter1_LunarSignalAnalysisIntro') {
             if (chosenInterpretationId === 'A') {
                 nextNodeId = 'Chapter1_PathA_Result';
-                pointsUpdate = { Enlightenment: 2, Trust: -1, Reality: 3 };
+                pointsUpdate = { Enlightenment: 2, Trust: -1, Reality: 3, Witness: 0 };
                 indicatorUpdate = { NeuralStability: 0.01 };
             } else if (chosenInterpretationId === 'B') {
                 nextNodeId = 'Chapter1_PathB_Result';
@@ -168,7 +172,7 @@ export const useGameStore = create((set, get) => ({
                 indicatorUpdate = { NeuralStability: -0.01 }; // Net effect after lock
             } else if (chosenInterpretationId === 'C') {
                 nextNodeId = 'Chapter1_PathC_Result';
-                pointsUpdate = { Enlightenment: -3, Trust: 1, Reality: 5 };
+                pointsUpdate = { Enlightenment: -3, Trust: 1, Reality: 5, Witness: 0 };
                 indicatorUpdate = { NeuralStability: 0.02 };
             }
         }
@@ -180,7 +184,7 @@ export const useGameStore = create((set, get) => ({
             newHiddenScores[key] = (newHiddenScores[key] || 0) + pointsUpdate[key];
             // Optional: Clamp scores if needed (e.g., Reality between 0-100)
         }
-
+        
         const newVisibleIndicators = { ...visibleIndicatorValues };
         // Ensure NeuralStability stays between 0 and 1 (or 0-100 if percentage)
         newVisibleIndicators.NeuralStability = Math.max(0, Math.min(1, (newVisibleIndicators.NeuralStability || 0) + indicatorUpdate.NeuralStability));
@@ -216,4 +220,15 @@ export const useGameStore = create((set, get) => ({
         console.log('Narrative advanced, tuning challenge cleared, view set to narrative.');
 
     }, // End of advanceNarrativeAction
+
+    // Add setIntroPhase action to Zustand store
+    setIntroPhase: (phase) => set((state) => {
+      console.log(`[Zustand] Setting introPhase from ${state.gameState.introPhase} to: ${phase}`);
+      return {
+        gameState: {
+          ...state.gameState,
+          introPhase: phase
+        }
+      };
+    }),
 }));
