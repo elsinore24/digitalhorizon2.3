@@ -243,21 +243,25 @@ const NarrativeReader = ({
     // Potentially show an error message to the user
   }, [stopAudio, setIsPausedByUser]); // Updated dependencies
 
-  // Effect 2: Attempt to play audio ONLY when path changes AND isPlaying is false
+  // Effect 2: Attempt to play audio ONLY when path changes AND isPlaying is false AND not paused by user
   useEffect(() => {
-    console.log(`[NarrativeReader Effect 2] Triggered. Path: ${currentAudioPath}, isPlaying: ${isPlaying}`);
+    console.log(`[NarrativeReader Effect 2] Triggered. Path: ${currentAudioPath}, isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}`);
 
-    // Check if we have a path AND we are definitively NOT playing
-    if (currentAudioPath && !isPlaying) {
-      console.log(`[NarrativeReader Effect 2] Conditions met. Calling playNarrativeAudio for: ${currentAudioPath}`);
+    // Check if we have a path AND we are definitively NOT playing AND not paused by user
+    if (currentAudioPath && !isPlaying && !isPausedByUser) {
+      console.log(`[NarrativeReader Effect 2] Conditions met (path ready, not playing, not paused by user). Calling playNarrativeAudio for: ${currentAudioPath}`);
       playNarrativeAudio(currentAudioPath, handleAudioEnded, handleAudioError);
       isNarrativeAudioPlayingRef.current = true; // Set ref to true when playback is initiated
     } else if (currentAudioPath && isPlaying) {
       // This case might happen if effects run rapidly. Log it.
       console.warn(`[NarrativeReader Effect 2] Has path ${currentAudioPath}, but isPlaying is already true. Playback skipped.`);
-      // Decide if you need to stop/reset here, or just wait for 'ended'
+    } else if (currentAudioPath && isPausedByUser) {
+      // This is the case we're fixing - don't auto-play when user has paused
+      console.log(`[NarrativeReader Effect 2] Has path ${currentAudioPath}, but isPausedByUser is true. Playback skipped.`);
+    } else {
+      console.log(`[NarrativeReader Effect 2] Conditions not met. Path: ${currentAudioPath}, isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}`);
     }
-  }, [currentAudioPath, isPlaying, playNarrativeAudio, handleAudioEnded, handleAudioError]); // Added callbacks to dependencies
+  }, [currentAudioPath, isPlaying, isPausedByUser, playNarrativeAudio, handleAudioEnded, handleAudioError]); // Added isPausedByUser to dependencies
 
 
   // Effect to calculate total scrollable height after narrative data is loaded and rendered
