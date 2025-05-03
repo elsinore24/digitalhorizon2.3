@@ -23,7 +23,7 @@ const LunarArrival = ({ dataPerceptionMode }) => {
     updateGameState: state.updateGameState,
     setRedAlertActive: state.setRedAlertActive,
   }));
-  const { isIOS, playAudioFile } = useAudio();
+  const { isIOS, playAudioFile, resumeContextAndUnlock } = useAudio();
 
   // Placeholder for lab background image path
   const labBackgroundImage = 'front_pic/lab.jpg'; // Corrected path and extension, removed leading slash
@@ -33,8 +33,19 @@ const LunarArrival = ({ dataPerceptionMode }) => {
 
   // --- Intro Sequence Handlers (These will need to be refactored later to use state flags) ---
   // For now, removing setIntroPhase calls to decouple from the old logic
-  const handleEnter = () => {
+  const handleEnter = async () => {
     console.log('Entering Digital Horizons - Triggering Red Alert.');
+    
+    // Resume audio context and unlock audio on iOS
+    console.log("Initial user interaction detected. Resuming context and attempting silent play...");
+    try {
+      await resumeContextAndUnlock();
+      console.log("Audio context resumed and unlocked successfully.");
+    } catch (error) {
+      console.error("Failed to resume/unlock audio context:", error);
+      // Continue anyway, as we still want to show the Red Alert
+    }
+    
     // Trigger the Red Alert using the new state flag
     setRedAlertActive(true);
     // Removed old logic to set currentNodeId and visitScene here

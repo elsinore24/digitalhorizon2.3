@@ -21,6 +21,7 @@ export function AudioProvider({ children }) {
   const audioRef = useRef(null) // Refers to Tone.Player or HTML5 element depending on context
   const [isMuted, setIsMuted] = useState(false) // Add mute state
   const [isIOS, setIsIOS] = useState(false)
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState(false) // Add state for tracking audio unlock status
 
   // Audio-related refs
   const audioContextRef = useRef(null)
@@ -93,6 +94,56 @@ export function AudioProvider({ children }) {
 
   // Track if iOS audio has been unlocked
   const [iOSAudioUnlocked, setIOSAudioUnlocked] = useState(false)
+  
+  // Function to resume audio context and unlock audio on iOS
+  const resumeContextAndUnlock = useCallback(async () => {
+    if (!audioContextRef.current) {
+      console.warn("[AudioContext] Context not available for resume/unlock.");
+      return Promise.reject("Audio context not initialized.");
+    }
+
+    let resumePromise = Promise.resolve();
+    if (audioContextRef.current.state === 'suspended') {
+      console.log('[AudioContext] Attempting to resume context from interaction...');
+      resumePromise = audioContextRef.current.resume().then(() => {
+        console.log('[AudioContext] Context successfully resumed via resume(). State:', audioContextRef.current.state);
+      }).catch(err => {
+        console.error('[AudioContext] Error resuming context:', err);
+        throw err; // Re-throw to signal failure
+      });
+    }
+
+    // Wait for resume() to potentially complete
+    await resumePromise;
+
+    // Check state *after* attempting resume
+    if (audioContextRef.current.state !== 'running') {
+       console.warn('[AudioContext] Context is not running after resume attempt. State:', audioContextRef.current.state);
+    }
+
+    // --- Play silent audio ---
+    console.log('[AudioContext] Attempting to play silent audio for unlocking...');
+    const silentPlayer = new Audio('/audio/effects/silence.wav'); // Path to your silent file
+    silentPlayer.setAttribute('playsinline', ''); // Good practice for iOS
+    silentPlayer.volume = 0.0001; // Effectively silent but not zero, sometimes helps
+
+    try {
+      await silentPlayer.play();
+      console.log('[AudioContext] Silent audio played successfully. Audio should be unlocked.');
+      setIsAudioUnlocked(true);
+      setIOSAudioUnlocked(true);
+    } catch (error) {
+      console.error('[AudioContext] Error playing silent audio:', error);
+      // Check if context is running, we might still be okay
+      if (audioContextRef.current.state === 'running') {
+         console.warn('[AudioContext] Silent play failed, but context is running. Proceeding cautiously.');
+         setIsAudioUnlocked(true);
+         setIOSAudioUnlocked(true);
+      } else {
+         throw error; // Re-throw if context isn't running AND silent play failed
+      }
+    }
+  }, []);
   
   // Initialize audio context and audio element
   const initAudioContext = useCallback(() => {
@@ -650,7 +701,9 @@ export function AudioProvider({ children }) {
     resumeAudio, // Expose resume function
     storeAudioStateBeforeToggle, // Expose new function
     restoreAudioStateAfterToggle, // Expose new function
-    cleanupCurrentAudio // Expose the cleanup function for external use if needed
+    cleanupCurrentAudio, // Expose the cleanup function for external use if needed
+    resumeContextAndUnlock, // Expose the new function for iOS audio unlock
+    isAudioUnlocked // Expose the audio unlock state
   };
 
   return (

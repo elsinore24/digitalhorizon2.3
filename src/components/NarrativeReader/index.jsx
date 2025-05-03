@@ -28,7 +28,8 @@ const NarrativeReader = ({
     resumeAudio,
     isPlaying,
     getAudioInstance,
-    stopAudio // Add stopAudio from useAudio
+    stopAudio, // Add stopAudio from useAudio
+    isAudioUnlocked // Add isAudioUnlocked from useAudio
   } = useAudio();
   const [isPausedByUser, setIsPausedByUser] = useState(false);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
@@ -243,13 +244,13 @@ const NarrativeReader = ({
     // Potentially show an error message to the user
   }, [stopAudio, setIsPausedByUser]); // Updated dependencies
 
-  // Effect 2: Attempt to play audio ONLY when path changes AND isPlaying is false AND not paused by user
+  // Effect 2: Attempt to play audio ONLY when path changes AND isPlaying is false AND not paused by user AND audio is unlocked
   useEffect(() => {
-    console.log(`[NarrativeReader Effect 2] Triggered. Path: ${currentAudioPath}, isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}`);
+    console.log(`[NarrativeReader Effect 2] Triggered. Path: ${currentAudioPath}, isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}, isAudioUnlocked: ${isAudioUnlocked}`);
 
-    // Check if we have a path AND we are definitively NOT playing AND not paused by user
-    if (currentAudioPath && !isPlaying && !isPausedByUser) {
-      console.log(`[NarrativeReader Effect 2] Conditions met (path ready, not playing, not paused by user). Calling playNarrativeAudio for: ${currentAudioPath}`);
+    // Check if we have a path AND we are definitively NOT playing AND not paused by user AND audio is unlocked
+    if (isAudioUnlocked && currentAudioPath && !isPlaying && !isPausedByUser) {
+      console.log(`[NarrativeReader Effect 2] Conditions met (Unlocked, path ready, not playing, not paused). Calling playNarrativeAudio for: ${currentAudioPath}`);
       playNarrativeAudio(currentAudioPath, handleAudioEnded, handleAudioError);
       isNarrativeAudioPlayingRef.current = true; // Set ref to true when playback is initiated
     } else if (currentAudioPath && isPlaying) {
@@ -258,10 +259,13 @@ const NarrativeReader = ({
     } else if (currentAudioPath && isPausedByUser) {
       // This is the case we're fixing - don't auto-play when user has paused
       console.log(`[NarrativeReader Effect 2] Has path ${currentAudioPath}, but isPausedByUser is true. Playback skipped.`);
+    } else if (currentAudioPath && !isAudioUnlocked) {
+      // New case - don't auto-play when audio is not unlocked
+      console.log('[NarrativeReader Effect 2] Skipped: Audio not unlocked yet.');
     } else {
-      console.log(`[NarrativeReader Effect 2] Conditions not met. Path: ${currentAudioPath}, isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}`);
+      console.log(`[NarrativeReader Effect 2] Conditions not met. Path: ${currentAudioPath}, isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}, isAudioUnlocked: ${isAudioUnlocked}`);
     }
-  }, [currentAudioPath, isPlaying, isPausedByUser, playNarrativeAudio, handleAudioEnded, handleAudioError]); // Added isPausedByUser to dependencies
+  }, [currentAudioPath, isPlaying, isPausedByUser, isAudioUnlocked, playNarrativeAudio, handleAudioEnded, handleAudioError]); // Added isAudioUnlocked to dependencies
 
 
   // Effect to calculate total scrollable height after narrative data is loaded and rendered
