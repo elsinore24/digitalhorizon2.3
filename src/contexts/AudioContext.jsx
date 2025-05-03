@@ -155,50 +155,6 @@ export function AudioProvider({ children }) {
     }
   }, []);
 
-  // --- Event Handlers (defined once, referenced later) ---
-  const handleCanPlay = useCallback(() => {
-    const element = currentAudioElementRef.current;
-    const context = audioContextRef.current;
-    const gainNode = masterGainNodeRef.current;
-
-    if (!element || !context || !gainNode || currentSourceNodeRef.current) {
-      console.warn('[AudioContext] handleCanPlay: Aborting - missing refs or source node already exists.');
-      return;
-    }
-    console.log(`[AudioContext] 'canplay' event for ${element.src}. Creating and connecting source node.`);
-
-    try {
-      const sourceNode = context.createMediaElementSource(element);
-      currentSourceNodeRef.current = sourceNode; // Store ref
-
-      // Connect graph: Source -> (Analyser?) -> Gain -> Destination
-      let currentNode = sourceNode;
-      if (analyzerRef.current) {
-        currentNode.connect(analyzerRef.current);
-        currentNode = analyzerRef.current;
-      }
-      currentNode.connect(gainNode);
-      gainNode.connect(context.destination); // Ensure gain is connected
-
-      console.log('[AudioContext] Source node created and connected. Attempting play.');
-      const playPromise = element.play();
-
-      if (playPromise) {
-        playPromise.then(() => {
-          console.log(`[AudioContext] Playback started for ${element.src}`);
-          setIsPlaying(true);
-          // Optionally call a callback to update isPlaying state in NarrativeReader
-        }).catch(err => {
-          console.error(`[AudioContext] Playback failed for ${element.src}:`, err);
-          handleError(err); // Treat play failure as an error
-        });
-      }
-    } catch (error) {
-      console.error('[AudioContext] Error creating/connecting source node:', error);
-      handleError(error); // Treat node creation failure as an error
-    }
-  }, []);
-
   // --- 1. Dedicated Cleanup Function ---
   const cleanupCurrentAudio = useCallback(() => {
     console.log('[AudioContext] cleanupCurrentAudio called.');
@@ -237,6 +193,58 @@ export function AudioProvider({ children }) {
     currentErrorCallbackRef.current = null;
     console.log('[AudioContext] Current audio instance cleanup complete.');
   }, []);
+
+  // --- Event Handlers (defined once, referenced later) ---
+  const handleCanPlay = useCallback(() => {
+    const element = currentAudioElementRef.current;
+    const context = audioContextRef.current;
+    const gainNode = masterGainNodeRef.current;
+
+    if (!element || !context || !gainNode || currentSourceNodeRef.current) {
+      console.warn('[AudioContext] handleCanPlay: Aborting - missing refs or source node already exists.');
+      return;
+    }
+    console.log(`[AudioContext] 'canplay' event for ${element.src}. Creating and connecting source node.`);
+
+    try {
+      const sourceNode = context.createMediaElementSource(element);
+      currentSourceNodeRef.current = sourceNode; // Store ref
+
+      // Connect graph: Source -> (Analyser?) -> Gain -> Destination
+      let currentNode = sourceNode;
+      if (analyzerRef.current) {
+        currentNode.connect(analyzerRef.current);
+        currentNode = analyzerRef.current;
+      }
+      currentNode.connect(gainNode);
+      gainNode.connect(context.destination); // Ensure gain is connected
+
+      console.log(`[AudioContext] Source node created and connected. Attempting play for ${element.src}`); // Modified logging
+      const playPromise = element.play();
+
+      if (playPromise !== undefined) { // Added check for promise existence
+          playPromise.then(_ => {
+              console.log(`[AudioContext] Playback started successfully for ${element.src}`); // Modified logging
+              setIsPlaying(true); // Set isPlaying to true when playback starts
+          }).catch(error => {
+              console.error(`[AudioContext] Playback FAILED for ${element.src}:`, error); // Modified logging
+              // *** THIS IS LIKELY WHERE THE iOS ERROR WILL APPEAR ***
+              // Clean up or signal error state if needed
+              if (currentErrorCallbackRef.current) { // Use the ref
+                  currentErrorCallbackRef.current(error); // Trigger the error callback
+              }
+              // Maybe call cleanup here?
+              cleanupCurrentAudio(); // Call cleanup on failure
+          });
+       } else {
+            console.warn("[AudioContext] audioElement.play() did not return a promise. Playback might not have started."); // Added logging
+            // Older browser? Unlikely, but good to know.
+       }
+     } catch (error) {
+       console.error('[AudioContext] Error creating/connecting source node:', error);
+       handleError(error); // Treat node creation failure as an error
+     }
+   }, [cleanupCurrentAudio, currentErrorCallbackRef]); // Added dependencies
 
   const handleEnded = useCallback(() => {
     const elementSrc = currentAudioElementRef.current?.src || 'unknown';
@@ -342,8 +350,10 @@ export function AudioProvider({ children }) {
         console.log('User interaction detected, resuming audio context');
         
         if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+          console.log('[AudioContext] Attempting to resume context from interaction...'); // Added logging
           audioContextRef.current.resume().then(() => {
-            console.log('AudioContext resumed successfully');
+            console.log('[AudioContext] Context successfully resumed via resume(). State:', audioContextRef.current.state); // Modified logging
+            // Potentially set a state flag here like setIsContextDefinitelyRunning(true)
             
             // For iOS, we need to unlock audio capabilities
             if (isIOS && !audioInitialized) {

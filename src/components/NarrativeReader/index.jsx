@@ -444,6 +444,7 @@ const NarrativeReader = ({
   // Handler for the Play/Pause button
   const handlePlayPause = (event) => {
     event.stopPropagation(); // Stop event propagation
+    console.log(`[NarrativeReader handlePlayPause] Clicked. isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}`); // Added logging
     if (isPlaying && !isPausedByUser) {
       console.log('[NarrativeReader handlePlayPause] Pausing audio');
       pauseAudio();
