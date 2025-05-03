@@ -84,7 +84,8 @@ const useAutoScroll = ({
       if (!audioInstance || !scrollRef.current || !(scrollableHeightRef.current > 0) || !(audioDuration > 0)) {
         // console.warn('[useAutoScroll] Missing instance, ref, valid height, or valid duration. Skipping scrollText.');
         // Request next frame even if skipping calculation, to keep the loop alive if conditions change
-        if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
+        // Modified condition to match the main condition below
+        if (isPlaying && isAutoScrollEnabled) {
            animationFrameIdRef.current = requestAnimationFrame(scrollText);
         }
         return;
@@ -114,14 +115,16 @@ const useAutoScroll = ({
         lastScrollTimeRef.current = timestamp; // Update last scroll time even without throttle for potential future use
       // }
 
-      if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
+      // Modified condition to match the main condition
+      if (isPlaying && isAutoScrollEnabled) {
         animationFrameIdRef.current = requestAnimationFrame(scrollText);
       }
     };
 
     // --- Debugging: Check conditions ---
-    console.log(`[useAutoScroll Condition Check] isPlaying: ${isPlaying}, isPausedByUser: ${!isPausedByUser}, isAutoScrollEnabled: ${isAutoScrollEnabled}`);
-    if (isPlaying && !isPausedByUser && isAutoScrollEnabled) {
+    console.log(`[useAutoScroll Condition Check] isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}, isAutoScrollEnabled: ${isAutoScrollEnabled}`);
+    // Modified condition to prioritize isPlaying over isPausedByUser
+    if (isPlaying && isAutoScrollEnabled) {
       console.log('[useAutoScroll Condition Check] Conditions met, requesting animation frame.');
       setIsScrolling(true);
       // setShowResumeButton(false); // Resume button removed

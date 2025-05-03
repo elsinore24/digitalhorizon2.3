@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import useGameState from '../../hooks/useGameState';
 import useAudio from '../../hooks/useAudio';
 import TemporalEcho from '../../components/TemporalEcho';
+import { useGameStore } from '../../store/useGameStore'; // Import useGameStore to access actions
 import Scene3D from '../../components/Scene3D';
 import DataPerceptionOverlay from '../../components/DataPerceptionOverlay';
 import NarrativeReader from '../../components/NarrativeReader';
@@ -13,9 +13,15 @@ import { destinations } from '../../config/destinations';
 import styles from './LunarArrival.module.scss';
 
 const LunarArrival = ({ dataPerceptionMode }) => {
-  // Get introPhase and setIntroPhase from the context
-  const { gameState, visitScene, updateGameState, setIntroPhase } = useGameState();
-  // Access gameState.introPhase directly in conditionals below
+  // Get gameState, currentNodeId, activeTuningChallenge, visitScene, updateGameState, and setRedAlertActive from the useGameStore
+  const { gameState, currentNodeId, activeTuningChallenge, visitScene, updateGameState, setRedAlertActive } = useGameStore(state => ({
+    gameState: state.gameState,
+    currentNodeId: state.gameState.currentNodeId,
+    activeTuningChallenge: state.activeTuningChallenge,
+    visitScene: state.visitScene,
+    updateGameState: state.updateGameState,
+    setRedAlertActive: state.setRedAlertActive,
+  }));
   const { isIOS, playAudioFile } = useAudio();
 
   // Placeholder for lab background image path
@@ -24,47 +30,52 @@ const LunarArrival = ({ dataPerceptionMode }) => {
   const flashbackNarrativeId = 'flashback_intro'; // TODO: Replace with actual narrative ID
   // Removed old useEffect that triggered moon_dialogue
 
-  // --- Intro Sequence Handlers ---
-
+  // --- Intro Sequence Handlers (These will need to be refactored later to use state flags) ---
+  // For now, removing setIntroPhase calls to decouple from the old logic
   const handleEnter = () => {
-    console.log('Entering Digital Horizons - Triggering Red Alert');
-    setIntroPhase('redAlert');
-    // Potentially mark scene visited here if needed
-    visitScene('lunar_arrival'); // Mark arrival if appropriate
+    console.log('Entering Digital Horizons - Triggering Red Alert.');
+    // Trigger the Red Alert using the new state flag
+    setRedAlertActive(true);
+    // Removed old logic to set currentNodeId and visitScene here
   };
 
   const handleAttemptRealign = () => {
-    console.log('Attempting Neural Realignment - Triggering Transition');
-    setIntroPhase('transitioning');
+    console.log('Attempting Neural Realignment - Triggering Transition (Placeholder)');
+    // Set the introPhase to 'transitioning' to show the IntroTransition component
+    updateGameState({ introPhase: 'transitioning' });
+    // Also set the Red Alert to inactive since we're moving to the next phase
+    setRedAlertActive(false);
   };
 
   const handleTransitionComplete = () => {
-    console.log('Transition Complete - Triggering Flashback Narrative');
-    setIntroPhase('flashbackNarrative');
-    // Set the currentNodeId to trigger the NarrativeReader
-    updateGameState({ currentNodeId: flashbackNarrativeId });
+    console.log('Transition Complete - Triggering Flashback Narrative (Placeholder)');
+    // Set the currentNodeId to trigger the NarrativeReader and update the introPhase
+    updateGameState({
+      currentNodeId: flashbackNarrativeId,
+      introPhase: 'flashbackNarrative' // Change from 'transitioning' to 'flashbackNarrative'
+    });
   };
 
   const handleNarrativeComplete = () => {
-    console.log('Flashback Narrative Complete - Triggering Choice Point');
-    setIntroPhase('flashbackChoice');
+    console.log('Flashback Narrative Complete - Triggering Choice Point (Placeholder)');
+    // TODO: Trigger Choice Point using a game state flag
   };
 
   const handleFlashbackChoice = (choice) => {
-    console.log(`Flashback Choice Selected: ${choice}`);
+    console.log(`Flashback Choice Selected: ${choice} (Placeholder)`);
     // Update game state with the choice
     updateGameState({ player: { ...gameState.player, flashbackChoice: choice } });
-    // Transition to the main game view using context function
-    setIntroPhase('mainGame');
+    // TODO: Transition to the main game view using a game state flag or by setting the next narrative node
   };
 
-  // Add logging to check gameState and introPhase
+  // Add logging to check gameState and currentNodeId/activeTuningChallenge
   console.log('[LunarArrival] Rendering. GameState:', gameState);
   if (!gameState) {
     console.log('[LunarArrival] gameState is null/undefined, returning null.');
     return null;
   }
-  console.log(`[LunarArrival] Rendering with introPhase: ${gameState.introPhase}`);
+  console.log(`[LunarArrival] Rendering with currentNodeId: ${currentNodeId}, activeTuningChallenge: ${activeTuningChallenge ? activeTuningChallenge.id : 'none'}`);
+
 
   // --- Render Logic ---
 
@@ -73,27 +84,48 @@ const LunarArrival = ({ dataPerceptionMode }) => {
       {/* Always render the 3D background */}
       <Scene3D dataPerceptionMode={dataPerceptionMode} />
 
-      {/* --- Overlays based on Intro Phase --- */}
+      {/* Render Narrative Reader when a currentNodeId is set and no tuning challenge is active */}
+      {currentNodeId && !activeTuningChallenge && (
+        <NarrativeReader
+          narrativeToLoad={currentNodeId} // Load narrative based on currentNodeId
+          backgroundImageUrl={labBackgroundImage} // Use placeholder image
+          // NarrativeReader now handles its own completion based on 'next' property
+        />
+      )}
 
-      {gameState.introPhase === 'initial' && (
-        // Removed undefined className from wrapper div
-        <div style={{ zIndex: 1200, position: 'relative' }}> {/* Keep zIndex, ensure positioning context */}
+      {/* Render Signal Tuning Interface when a tuning challenge is active */}
+      {activeTuningChallenge && (
+        <SignalTuningInterface
+          challengeConfig={activeTuningChallenge}
+          // advanceNarrative prop is passed in GameContainer
+        />
+      )}
+
+
+      {/* --- Overlays based on State Flags (Placeholder - will be refactored) --- */}
+      {/* These components will need new state flags to control their rendering */}
+
+      {/* Example: Initial Enter Button (Placeholder - needs new state flag) */}
+      {gameState.introPhase === 'initial' && ( // Keep for now, will be refactored
+        <div style={{ zIndex: 1200, position: 'relative' }}>
           <button className={styles.enterButton} onClick={handleEnter}>
             Enter Digital Horizons
           </button>
         </div>
       )}
 
-      {gameState.introPhase === 'redAlert' && (
+      {/* Example: Red Alert Interface (Placeholder - needs new state flag) */}
+      {/* Example: Red Alert Interface (Now controlled by isRedAlertActive flag) */}
+      {gameState.isRedAlertActive && (
         <RedAlertInterface onAttemptRealign={handleAttemptRealign} />
       )}
 
-      {/* Render Lab Scene background during transition, narrative and choice phases */}
-      {(gameState.introPhase === 'transitioning' || gameState.introPhase === 'flashbackNarrative' || gameState.introPhase === 'flashbackChoice') && (
+      {/* Example: Flashback Lab Scene Background (Placeholder - needs new state flag) */}
+      {(gameState.introPhase === 'transitioning' || gameState.introPhase === 'flashbackNarrative' || gameState.introPhase === 'flashbackChoice') && ( // Keep for now, will be refactored
         <FlashbackLabScene />
       )}
 
-      {/* Render IntroTransition in a separate portal div to isolate it from WebGL context */}
+      {/* Example: Intro Transition (Placeholder - needs new state flag) */}
       {gameState.introPhase === 'transitioning' && (
         <div style={{
           position: 'fixed',
@@ -101,32 +133,20 @@ const LunarArrival = ({ dataPerceptionMode }) => {
           left: 0,
           width: '100%',
           height: '100%',
-          zIndex: 1500, // Higher z-index to ensure it's on top
-          pointerEvents: 'auto' // Allow interaction with the transition
+          zIndex: 1500,
+          pointerEvents: 'auto'
         }}>
-          <IntroTransition onComplete={handleTransitionComplete} />
+          <IntroTransition onComplete={handleTransitionComplete} startTransition={true} /> {/* Pass startTransition prop */}
         </div>
       )}
 
-      {/* Render Narrative Reader during its phase */}
-      {/* Render Narrative Reader during its phase, hide visually instead of unmounting */}
-      {gameState.introPhase === 'flashbackNarrative' && (
-        <div style={{ display: dataPerceptionMode ? 'none' : 'block' }}>
-          <NarrativeReader
-            narrativeToLoad={flashbackNarrativeId} // Pass the narrative ID as a prop
-            backgroundImageUrl={labBackgroundImage} // Use placeholder image
-            // Removed onComplete prop to allow NarrativeReader to handle progression via 'next' property
-          />
-        </div>
-      )}
-
-      {/* Render Choice Point during its phase */}
-      {gameState.introPhase === 'flashbackChoice' && (
+      {/* Example: Choice Point (Placeholder - needs new state flag) */}
+      {gameState.introPhase === 'flashbackChoice' && ( // Keep for now, will be refactored
         <ChoicePoint onChoiceSelected={handleFlashbackChoice} />
       )}
 
-      {/* --- Data Perception Elements (Rendered based on dataPerceptionMode, NOT introPhase) --- */}
-      {/* Moved OUTSIDE the 'mainGame' check */}
+
+      {/* --- Data Perception Elements (Rendered based on dataPerceptionMode) --- */}
       <DataPerceptionOverlay active={dataPerceptionMode} />
       <div className={styles.environment}>
         {dataPerceptionMode && (
@@ -142,12 +162,10 @@ const LunarArrival = ({ dataPerceptionMode }) => {
         )}
       </div>
 
-      {/* --- Main Game Specific UI (Still rendered only when intro is complete) --- */}
-      {gameState.introPhase === 'mainGame' && (
+      {/* --- Main Game Specific UI (Placeholder - needs new state flag) --- */}
+      {gameState.introPhase === 'mainGame' && ( // Keep for now, will be refactored
         <>
           {/* Potentially add other main game UI elements here */}
-          {/* Example: Maybe a default narrative starts after the choice? */}
-          {/* {activeNarrativeId && <NarrativeReader narrativeId={activeNarrativeId} ... />} */}
         </>
       )}
 

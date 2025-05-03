@@ -5,32 +5,42 @@ import styles from './IntroTransition.module.scss';
 const TEXT_DISPLAY_DURATION = 4000; // 4 seconds
 const FADE_DURATION = 1500; // 1.5 seconds for fade out
 
-const IntroTransition = ({ onComplete }) => {
-  const [animationPhase, setAnimationPhase] = useState('text'); // 'text', 'fading', 'done'
+const IntroTransition = ({ onComplete, startTransition }) => {
+  const [animationPhase, setAnimationPhase] = useState('idle'); // 'idle', 'text', 'fading', 'done'
   
   const containerRef = useRef(null);
   const textContainerRef = useRef(null);
   
-  // Initial setup and text display
+  // Start transition when startTransition prop becomes true
   useEffect(() => {
-    console.log('[IntroTransition] Component mounted, starting text phase');
-    
-    // Make sure text container is visible
-    if (textContainerRef.current) {
-      textContainerRef.current.style.visibility = 'visible';
-      textContainerRef.current.style.opacity = '1';
+    if (startTransition && animationPhase === 'idle') {
+      console.log('[IntroTransition] startTransition is true, starting text phase');
+      setAnimationPhase('text');
     }
-    
-    // Timer to trigger fading phase after text display
-    const timer = setTimeout(() => {
-      console.log('[IntroTransition] Text display complete, transitioning to fading phase');
-      setAnimationPhase('fading');
-    }, TEXT_DISPLAY_DURATION);
-    
-    return () => {
-      clearTimeout(timer);
-    };
-  }, []);
+  }, [startTransition, animationPhase]);
+
+  // Handle text display phase
+  useEffect(() => {
+    if (animationPhase === 'text') {
+      console.log('[IntroTransition] Starting text phase');
+      
+      // Make sure text container is visible
+      if (textContainerRef.current) {
+        textContainerRef.current.style.visibility = 'visible';
+        textContainerRef.current.style.opacity = '1';
+      }
+      
+      // Timer to trigger fading phase after text display
+      const timer = setTimeout(() => {
+        console.log('[IntroTransition] Text display complete, transitioning to fading phase');
+        setAnimationPhase('fading');
+      }, TEXT_DISPLAY_DURATION);
+      
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+  }, [animationPhase]); // Depend on animationPhase
   
   // Handle fading phase
   useEffect(() => {
@@ -65,6 +75,11 @@ const IntroTransition = ({ onComplete }) => {
   
   console.log(`[IntroTransition] Current animation phase: ${animationPhase}`);
   
+  // Only render the transition container if not in 'idle' or 'done' phase
+  if (animationPhase === 'idle' || animationPhase === 'done') {
+    return null;
+  }
+
   return (
     <div ref={containerRef} className={styles.transitionContainer} style={{
       position: 'relative',
@@ -86,8 +101,8 @@ const IntroTransition = ({ onComplete }) => {
           flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          visibility: 'visible',
-          opacity: 1,
+          visibility: animationPhase === 'text' ? 'visible' : 'hidden', // Control visibility based on phase
+          opacity: animationPhase === 'text' ? 1 : 0, // Control opacity based on phase
           transition: `opacity ${FADE_DURATION/1000}s ease-out`,
           zIndex: 1000,
           backgroundColor: 'rgba(0, 0, 0, 0.9)'

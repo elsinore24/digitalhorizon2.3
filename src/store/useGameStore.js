@@ -7,6 +7,7 @@ const initialGameState = {
     decisionHistory: {},
     hiddenPointScores: { Enlightenment: 0, Trust: 0, Witness: 0, Reality: 100 },
     visibleIndicatorValues: { NeuralStability: 0.95, PhysicalVitality: 'OPTIMAL', ConsciousnessSpectrum: 'SEPARATE' },
+    isRedAlertActive: false, // State flag for Red Alert
     // Add other necessary state fields...
 };
 
@@ -34,6 +35,9 @@ export const useGameStore = create((set, get) => ({
     setGameState: (newState) => set({ gameState: newState, isGameLoaded: true }),
     updateGameState: (updates) => set((state) => ({ gameState: { ...state.gameState, ...updates } })),
     resetGameState: () => set({ gameState: initialGameState, isGameLoaded: false }), // For restarting
+
+    // --- Red Alert Actions ---
+    setRedAlertActive: (isActive) => set({ gameState: { ...get().gameState, isRedAlertActive: isActive } }),
 
     // --- Save/Load Actions ---
     saveGameStateToServer: async () => {
@@ -180,7 +184,7 @@ export const useGameStore = create((set, get) => ({
             newHiddenScores[key] = (newHiddenScores[key] || 0) + pointsUpdate[key];
             // Optional: Clamp scores if needed (e.g., Reality between 0-100)
         }
-
+        
         const newVisibleIndicators = { ...visibleIndicatorValues };
         // Ensure NeuralStability stays between 0 and 1 (or 0-100 if percentage)
         newVisibleIndicators.NeuralStability = Math.max(0, Math.min(1, (newVisibleIndicators.NeuralStability || 0) + indicatorUpdate.NeuralStability));
@@ -216,4 +220,15 @@ export const useGameStore = create((set, get) => ({
         console.log('Narrative advanced, tuning challenge cleared, view set to narrative.');
 
     }, // End of advanceNarrativeAction
+
+    // Add setIntroPhase action to Zustand store
+    setIntroPhase: (phase) => set((state) => {
+      console.log(`[Zustand] Setting introPhase from ${state.gameState.introPhase} to: ${phase}`);
+      return {
+        gameState: {
+          ...state.gameState,
+          introPhase: phase
+        }
+      };
+    }),
 }));

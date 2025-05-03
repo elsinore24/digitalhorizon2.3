@@ -2,7 +2,11 @@ import { createContext, useState, useRef, useCallback, useEffect } from 'react'
 import dialogueData from '../data/dialogue.json'
 import * as Tone from 'tone'
 
-export const AudioContext = createContext(null)
+// Rename to avoid conflict with browser's AudioContext
+const AudioPlayerContext = createContext(null)
+
+// Export the context
+export { AudioPlayerContext as AudioContext }
 
 // Modified to always return local URL to avoid CORS issues
 // const getAudioUrl = (filename) => {
@@ -806,8 +810,30 @@ export function AudioProvider({ children }) {
     }
   });
 
-  // Wrapper function to maintain API compatibility
+  // Function to play narrative audio
+  const playNarrativeAudio = useCallback((filePath, onComplete) => {
+    console.log('[AudioContext] playNarrativeAudio called with:', filePath);
+    
+    // Make sure audio context is running before playing
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().then(() => {
+        console.log('[AudioContext] Audio context resumed before playing narrative audio');
+        // Use the existing playAudioFileRef logic for narrative audio
+        playAudioFileRef.current(filePath, onComplete);
+      }).catch(err => {
+        console.error('[AudioContext] Failed to resume audio context:', err);
+        // Try to play anyway
+        playAudioFileRef.current(filePath, onComplete);
+      });
+    } else {
+      // Audio context is already running or not available
+      playAudioFileRef.current(filePath, onComplete);
+    }
+  }, []); // No dependencies needed since we're using refs
+
+  // Wrapper function to maintain API compatibility (can be removed if not used for non-narrative audio)
   const playAudioFile = useCallback((filePath, onComplete) => { // Accept onComplete callback
+    console.log('[AudioContext] playAudioFile called (might be for non-narrative audio):', filePath);
     return playAudioFileRef.current(filePath, onComplete);
   }, []); // No dependencies needed since we're using refs
 
@@ -1003,7 +1029,8 @@ export function AudioProvider({ children }) {
     analyzer: analyzerRef.current,
     isMuted, // Expose mute state
     toggleMute, // Expose toggle function
-    playAudioFile, // Expose new function
+    playAudioFile, // Expose playAudioFile (if still needed for non-narrative audio)
+    playNarrativeAudio, // Expose new function for narrative audio
     pauseAudio, // Expose pause function
     resumeAudio: resumeAudio, // Expose resume function
     storeAudioStateBeforeToggle: storeAudioStateBeforeToggle, // Expose new function
@@ -1011,8 +1038,8 @@ export function AudioProvider({ children }) {
   };
 
   return (
-    <AudioContext.Provider value={providerValue}>
+    <AudioPlayerContext.Provider value={providerValue}>
       {children}
-    </AudioContext.Provider>
+    </AudioPlayerContext.Provider>
   );
 }

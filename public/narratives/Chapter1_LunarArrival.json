@@ -34,4 +34,6 @@
     }
   ],
   "generation_method": "rag"
+,
+  "next": "Chapter1_LunarSignalAnalysisIntro"
 }

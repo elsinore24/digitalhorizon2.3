@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'; // Import useCallback
+import React, { useCallback, useEffect } from 'react'; // Import useCallback and useEffect
 import { BrowserRouter as Router } from 'react-router-dom';
 import GameContainer from './components/GameContainer';
 import DialogueDisplay from './components/DialogueDisplay';
@@ -23,6 +23,15 @@ function AppContent() {
     currentView: state.currentView,
     setView: state.setView,
   }));
+
+  // Get the updateGameState action from the store
+  const updateGameState = useGameStore(state => state.updateGameState);
+
+  // Explicitly set initial game state on mount
+  useEffect(() => {
+    updateGameState({ currentNodeId: null, introPhase: 'initial' });
+    console.log('[AppContent] Explicitly set initial game state.');
+  }, [updateGameState]); // Depend on updateGameState
 
   // Placeholder function for advanceNarrative
   // Get the action directly from the store hook
