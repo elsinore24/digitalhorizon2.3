@@ -9,6 +9,7 @@ import RedAlertInterface from '../../components/RedAlertInterface'; // Import ne
 import FlashbackLabScene from '../../components/FlashbackLabScene'; // Import new component
 import IntroTransition from '../../components/IntroTransition'; // Import new component
 import ChoicePoint from '../../components/ChoicePoint'; // Import new component
+import SignalTuningInterface from '../../components/SignalTuningInterface'; // Import SignalTuningInterface component
 import { destinations } from '../../config/destinations';
 import styles from './LunarArrival.module.scss';
 
