@@ -17,7 +17,8 @@ export default function useAudio() {
     playNarrativeAudio: context?.playNarrativeAudio, // Add playNarrativeAudio from context
     storeAudioStateBeforeToggle: context?.storeAudioStateBeforeToggle,
     restoreAudioStateAfterToggle: context?.restoreAudioStateAfterToggle,
-    stopNarration: context?.stopNarration // Add stopNarration from context
+    stopNarration: context?.stopNarration, // Add stopNarration from context
+    resumeContextAndUnlock: context?.resumeContextAndUnlock // Add resumeContextAndUnlock from context
   });
   
   // Update the refs when the context functions change
@@ -33,7 +34,8 @@ export default function useAudio() {
       playNarrativeAudio: context?.playNarrativeAudio, // Add playNarrativeAudio from context
       storeAudioStateBeforeToggle: context?.storeAudioStateBeforeToggle,
       restoreAudioStateAfterToggle: context?.restoreAudioStateAfterToggle,
-      stopNarration: context?.stopNarration // Add stopNarration to the effect update
+      stopNarration: context?.stopNarration, // Add stopNarration to the effect update
+      resumeContextAndUnlock: context?.resumeContextAndUnlock // Add resumeContextAndUnlock to the effect update
     };
   }, [
     context?.playNarration,
@@ -46,7 +48,8 @@ export default function useAudio() {
     context?.playNarrativeAudio, // Add playNarrativeAudio to dependencies
     context?.storeAudioStateBeforeToggle,
     context?.restoreAudioStateAfterToggle,
-    context?.stopNarration // Add stopNarration to dependencies
+    context?.stopNarration, // Add stopNarration to dependencies
+    context?.resumeContextAndUnlock // Add resumeContextAndUnlock to dependencies
   ]);
   
   // Wrap the context methods in useCallback with empty dependency arrays
@@ -120,12 +123,21 @@ export default function useAudio() {
       contextFunctionsRef.current.stopNarration();
     }
   }, []);
+  
+  // Add resumeContextAndUnlock function
+  const resumeContextAndUnlock = useCallback(async () => {
+    if (contextFunctionsRef.current.resumeContextAndUnlock) {
+      return contextFunctionsRef.current.resumeContextAndUnlock();
+    }
+    return Promise.reject("resumeContextAndUnlock function not available");
+  }, []);
 
   // Return a consistent object shape every time
   return {
     isPlaying: context ? context.isPlaying : false,
     currentTrack: context ? context.currentTrack : null,
     currentDialogue: context ? context.currentDialogue : null,
+    isAudioUnlocked: context ? context.isAudioUnlocked : false, // Expose isAudioUnlocked state
     playNarration,
     getAudioInstance,
     getAnalyzerData,
@@ -138,6 +150,7 @@ export default function useAudio() {
     resumeAudio,
     storeAudioStateBeforeToggle,
     restoreAudioStateAfterToggle,
-    stopAudio // Include stopAudio in the returned object
+    stopAudio, // Include stopAudio in the returned object
+    resumeContextAndUnlock // Include resumeContextAndUnlock in the returned object
   }
 }
