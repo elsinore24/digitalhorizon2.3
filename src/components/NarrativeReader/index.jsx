@@ -29,9 +29,11 @@ const NarrativeReader = ({
     isPlaying,
     getAudioInstance,
     stopAudio, // Add stopAudio from useAudio
-    isAudioUnlocked // Add isAudioUnlocked from useAudio
+    isAudioUnlocked, // Add isAudioUnlocked from useAudio
+    hasPlayedAnyAudio // Add hasPlayedAnyAudio from useAudio
   } = useAudio();
   const [isPausedByUser, setIsPausedByUser] = useState(false);
+  const [needsFirstPlayClick, setNeedsFirstPlayClick] = useState(false); // Add state for first play click
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [imageVisible, setImageVisible] = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
@@ -189,6 +191,14 @@ const NarrativeReader = ({
            // Instead of playing immediately, just set the audio path
            // This will trigger Effect 2 which will handle playback
            setCurrentAudioPath(data.audio);
+           
+           // Check if this is the first audio encounter
+           if (!hasPlayedAnyAudio) {
+             console.log('[NarrativeReader Effect 1] This is the first audio encounter, setting needsFirstPlayClick to true');
+             setNeedsFirstPlayClick(true);
+           } else {
+             setNeedsFirstPlayClick(false);
+           }
          } else {
            console.warn(`Narrative ${narrativeToLoad} is missing the 'audio' property in its JSON data.`);
            isNarrativeAudioPlayingRef.current = false; // Set ref to false if no audio
@@ -244,13 +254,13 @@ const NarrativeReader = ({
     // Potentially show an error message to the user
   }, [stopAudio, setIsPausedByUser]); // Updated dependencies
 
-  // Effect 2: Attempt to play audio ONLY when path changes AND isPlaying is false AND not paused by user AND audio is unlocked
+  // Effect 2: Attempt to play audio ONLY when path changes AND isPlaying is false AND not paused by user AND audio is unlocked AND not needing first play click
   useEffect(() => {
-    console.log(`[NarrativeReader Effect 2] Triggered. Path: ${currentAudioPath}, isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}, isAudioUnlocked: ${isAudioUnlocked}`);
+    console.log(`[NarrativeReader Effect 2] Triggered. Path: ${currentAudioPath}, isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}, isAudioUnlocked: ${isAudioUnlocked}, needsFirstPlayClick: ${needsFirstPlayClick}`);
 
-    // Check if we have a path AND we are definitively NOT playing AND not paused by user AND audio is unlocked
-    if (isAudioUnlocked && currentAudioPath && !isPlaying && !isPausedByUser) {
-      console.log(`[NarrativeReader Effect 2] Conditions met (Unlocked, path ready, not playing, not paused). Calling playNarrativeAudio for: ${currentAudioPath}`);
+    // Check if we have a path AND we are definitively NOT playing AND not paused by user AND audio is unlocked AND not needing first play click
+    if (isAudioUnlocked && currentAudioPath && !isPlaying && !isPausedByUser && !needsFirstPlayClick) {
+      console.log(`[NarrativeReader Effect 2] Conditions met (Unlocked, path ready, not playing, not paused, not first play). Calling playNarrativeAudio for: ${currentAudioPath}`);
       playNarrativeAudio(currentAudioPath, handleAudioEnded, handleAudioError);
       isNarrativeAudioPlayingRef.current = true; // Set ref to true when playback is initiated
     } else if (currentAudioPath && isPlaying) {
@@ -262,10 +272,13 @@ const NarrativeReader = ({
     } else if (currentAudioPath && !isAudioUnlocked) {
       // New case - don't auto-play when audio is not unlocked
       console.log('[NarrativeReader Effect 2] Skipped: Audio not unlocked yet.');
+    } else if (currentAudioPath && needsFirstPlayClick) {
+      // New case - don't auto-play when this is the first audio and needs explicit click
+      console.log('[NarrativeReader Effect 2] Skipped: First audio needs explicit play button click.');
     } else {
-      console.log(`[NarrativeReader Effect 2] Conditions not met. Path: ${currentAudioPath}, isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}, isAudioUnlocked: ${isAudioUnlocked}`);
+      console.log(`[NarrativeReader Effect 2] Conditions not met. Path: ${currentAudioPath}, isPlaying: ${isPlaying}, isPausedByUser: ${isPausedByUser}, isAudioUnlocked: ${isAudioUnlocked}, needsFirstPlayClick: ${needsFirstPlayClick}`);
     }
-  }, [currentAudioPath, isPlaying, isPausedByUser, isAudioUnlocked, playNarrativeAudio, handleAudioEnded, handleAudioError]); // Added isAudioUnlocked to dependencies
+  }, [currentAudioPath, isPlaying, isPausedByUser, isAudioUnlocked, needsFirstPlayClick, playNarrativeAudio, handleAudioEnded, handleAudioError]); // Added needsFirstPlayClick to dependencies
 
 
   // Effect to calculate total scrollable height after narrative data is loaded and rendered
@@ -460,6 +473,17 @@ const NarrativeReader = ({
       setIsPausedByUser(false); // Set isPausedByUser to false when resuming
     }
   };
+  
+  // Handler for the first play button
+  const handleFirstPlay = (event) => {
+    event.stopPropagation(); // Stop event propagation
+    console.log('[NarrativeReader handleFirstPlay] First play button clicked');
+    if (currentAudioPath) {
+      playNarrativeAudio(currentAudioPath, handleAudioEnded, handleAudioError);
+      setNeedsFirstPlayClick(false); // No longer needs first play click
+      isNarrativeAudioPlayingRef.current = true;
+    }
+  };
 
   // Effect to update isPausedByUser based on isPlaying
   useEffect(() => {
@@ -544,11 +568,21 @@ const NarrativeReader = ({
               ))}
             </div>
             <div className={styles.navigation}>
-              {/* Play/Pause Button with Ref */}
-              {narrativeData && ( // Render when narrative is loaded
-                 <button ref={playPauseButtonRef} onClick={handlePlayPause}>
-                   {isPausedByUser ? 'Resume' : 'Pause'}
-                 </button>
+              {/* First Play Button - only shown when needsFirstPlayClick is true */}
+              {narrativeData && needsFirstPlayClick && (
+                <button
+                  className={styles.firstPlayButton}
+                  onClick={handleFirstPlay}
+                >
+                  Play Narration
+                </button>
+              )}
+              
+              {/* Play/Pause Button with Ref - only shown when not needsFirstPlayClick or isPlaying */}
+              {narrativeData && (!needsFirstPlayClick || isPlaying) && (
+                <button ref={playPauseButtonRef} onClick={handlePlayPause}>
+                  {isPausedByUser ? 'Resume' : 'Pause'}
+                </button>
               )}
 
               {/* Auto Scroll Toggle */}
