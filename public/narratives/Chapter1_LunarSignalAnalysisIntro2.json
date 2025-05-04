@@ -1,0 +1,27 @@
+{
+  "id": "the_deep_1746324348_0ed0ae",
+  "audio": "/audio/narration/ch1_signal_intro.mp3",
+  "pages": [
+    {
+      "text": "The deep silence enveloped the control room, broken only by the faint, complex electronic hum that layered over the raw signal feed. Alara's voice cut through the stillness, her tone calm and clear, as she initiated the connection to the Armstrong Base network.",
+      "timestamp": 0,
+      "imageUrl": "/front_pic/pic14.jpg"
+    },
+    {
+      "text": "As the data processing whirred in the background, Alara's voice continued to provide a steady commentary. She mentioned the isolation of an anomalous signature labeled 'Tau Ceti Prime', emphasizing the minimal amplitude and heavy interference patterns detected, hinting at the challenges posed by the interstellar medium distortion.",
+      "timestamp": 13.05,
+      "imageUrl": "/front_pic/pic14.jpg"
+    },
+    {
+      "text": "The visual display could shift focus, providing glimpses of Thorne's virtual hand gesturing towards the distant Armstrong Base domes, or showcasing an abstract overlay resembling noisy sensor data flickering over the lunar view. Alternatively, a close-up on a virtual console display could reveal chaotic waveforms dancing across the screen.",
+      "timestamp": 29.65,
+      "imageUrl": "/front_pic/pic14.jpg"
+    },
+    {
+      "text": "Alara prompted for cognitive input, highlighting the need for human interpretation due to the weak signal strength that defied algorithmic classification amidst the pervasive noise. The perceptual interface, denoted by a pulsing \"Toggle Perception\" button, awaited activation for the tuning of the cryptic signal.",
+      "timestamp": 46.7,
+      "imageUrl": "/front_pic/pic14.jpg"
+    }
+  ],
+  "generation_method": "rag"
+}

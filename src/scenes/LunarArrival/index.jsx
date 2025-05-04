@@ -14,6 +14,7 @@ import { destinations } from '../../config/destinations';
 import styles from './LunarArrival.module.scss';
 
 const LunarArrival = ({ dataPerceptionMode }) => {
+console.log('[LunarArrival] Component Rendering');
   // Get gameState, currentNodeId, activeTuningChallenge, visitScene, updateGameState, and setRedAlertActive from the useGameStore
   const { gameState, currentNodeId, activeTuningChallenge, visitScene, updateGameState, setRedAlertActive } = useGameStore(state => ({
     gameState: state.gameState,

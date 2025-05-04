@@ -8,6 +8,7 @@ function PerceptionPage() {
     const activeTuningChallenge = useGameStore((state) => state.activeTuningChallenge);
     const advanceNarrativeAction = useGameStore((state) => state.advanceNarrativeAction);
 
+console.log('[PerceptionPage] Rendering with activeTuningChallenge:', activeTuningChallenge);
     return (
         <div className={styles['perception-page']}> {/* Apply the CSS module class */}
             {activeTuningChallenge ? (

@@ -209,6 +209,11 @@ function SignalTuningInterface({ advanceNarrative, challengeConfig }) {
   const [tuningFilterStrength, setTuningFilterStrength] = useState(0); // State for tuning filter strength
   const [dominantInterpretation, setDominantInterpretation] = useState(null); // State for the dominant signal interpretation
 
+// If challengeConfig is not provided, don't render anything
+  if (!challengeConfig) {
+    console.log('[SignalTuningInterface] challengeConfig is null/undefined, returning null.');
+    return null;
+  }
   // State for the target signal properties (example: a simple sine wave)
   // These will now come from challengeConfig
   // const [targetFrequency, setTargetFrequency] = useState(60); // Example target frequency
