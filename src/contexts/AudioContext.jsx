@@ -22,6 +22,7 @@ export function AudioProvider({ children }) {
   const [isMuted, setIsMuted] = useState(false) // Add mute state
   const [isIOS, setIsIOS] = useState(false)
   const [isAudioUnlocked, setIsAudioUnlocked] = useState(false) // Add state for tracking audio unlock status
+  const [hasPlayedAnyAudio, setHasPlayedAnyAudio] = useState(false) // Add state to track if any audio has been played
 
   // Audio-related refs
   const audioContextRef = useRef(null)
@@ -277,6 +278,12 @@ export function AudioProvider({ children }) {
           playPromise.then(_ => {
               console.log(`[AudioContext] Playback started successfully for ${element.src}`); // Modified logging
               setIsPlaying(true); // Set isPlaying to true when playback starts
+              
+              // Check and set the flag for first audio playback
+              if (!hasPlayedAnyAudio) {
+                  setHasPlayedAnyAudio(true);
+                  console.log('[AudioContext] First audio playback initiated for this session.');
+              }
           }).catch(error => {
               console.error(`[AudioContext] Playback FAILED for ${element.src}:`, error); // Modified logging
               // *** THIS IS LIKELY WHERE THE iOS ERROR WILL APPEAR ***
@@ -703,7 +710,8 @@ export function AudioProvider({ children }) {
     restoreAudioStateAfterToggle, // Expose new function
     cleanupCurrentAudio, // Expose the cleanup function for external use if needed
     resumeContextAndUnlock, // Expose the new function for iOS audio unlock
-    isAudioUnlocked // Expose the audio unlock state
+    isAudioUnlocked, // Expose the audio unlock state
+    hasPlayedAnyAudio // Expose the flag for first audio playback
   };
 
   return (
